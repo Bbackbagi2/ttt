@@ -1,17 +1,17 @@
-/* One calm dark theme drawn from the tile wall: slate-teal ground, muted glaze accents. */
+/* One calm near-black theme; the cobalt and terracotta glazes appear only as quiet accents. */
 :root {
-  --bg: #1b2328;
-  --raised: #232d33;
-  --sunken: #161d21;
-  --control: #2a353c;
-  --control-on: #34424a;
-  --line: #303c43;
-  --ink: #d8dfe0;
-  --muted: #8a989e;
-  --faint: #5f6d73;
+  --bg: #0e0f10;
+  --raised: #1a1b1d;
+  --sunken: #080909;
+  --control: #222426;
+  --control-on: #2e3134;
+  --line: #232527;
+  --ink: #dcdedf;
+  --muted: #8b8f93;
+  --faint: #5c6064;
   --accent: #b98f7e;       /* terracotta glaze, used sparingly */
-  --primary: #8fb0c4;      /* pale cobalt for focus and the main action */
-  --primary-fill: #3a5566;
+  --primary: #93aec0;      /* pale cobalt for focus and the main action */
+  --primary-fill: #2f4250;
   --warn: #d49a84;
   --r: 12px;
   color-scheme: dark;
@@ -93,7 +93,7 @@ h1 { font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
 .stage { display: flex; justify-content: center; padding: 4px 16px 12px; }
 .preview {
   height: min(44vh, 440px); width: auto; aspect-ratio: 3 / 4; max-width: 100%;
-  border-radius: 4px; background: #2b363c;
+  border-radius: 4px; background: #1d1f21;
   box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
 }
 .preview.grab { touch-action: none; cursor: grab; }

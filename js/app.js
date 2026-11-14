@@ -1,5 +1,5 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=7';
-import * as store from './store.js?v=7';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=8';
+import * as store from './store.js?v=8';
 
 const $ = id => document.getElementById(id);
 const CAPTION_LIMIT = 2200;

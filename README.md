@@ -31,7 +31,7 @@
 | `assets/glaze/` | 유약 오버레이 (가로·세로·정사각) |
 | `assets/title.woff` | 제목 서체 |
 | `tools/bake.py` | Mac에서 위 자원을 굽는 스크립트 |
-| `tools/icons.py` | 라이브러리 획·타일로 앱 아이콘 후보를 만드는 스크립트. `--only app`은 채택한 아이콘(C6 코발트)을 `icon-1024.png`·180·512로 씁니다 |
+| `tools/icons.py` | 라이브러리 획·타일로 앱 아이콘 후보를 만드는 스크립트. `--only app`은 채택한 아이콘(C6 코발트)을 `icon-1024.png`와 `icon-c6-180.png`·`icon-c6-512.png`로 씁니다. 아이콘을 바꿀 때는 iOS 캐시 때문에 파일 이름도 바꿉니다 |
 
 ## 자원 굽기 (Mac)
 
