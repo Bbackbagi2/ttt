@@ -64,6 +64,14 @@ NAMES = {
 }
 
 
+def icon_hash():
+    """Short content hash of icon-1024.png. iOS caches home-screen icons hard, so every
+    new icon is published under a new file name; update index.html and
+    manifest.webmanifest to the printed name."""
+    import hashlib
+    return hashlib.sha1((APP / 'icon-1024.png').read_bytes()).hexdigest()[:7]
+
+
 def rgb(value):
     return np.array(ImageColor.getrgb(value), dtype=np.float32)
 
@@ -397,7 +405,7 @@ def main():
     if icon_src.exists():
         with Image.open(icon_src) as image:
             for size in (180, 512):
-                image.convert('RGB').resize((size, size), RESAMPLE).save(APP / f'icon-c6-{size}.png', optimize=True)
+                image.convert('RGB').resize((size, size), RESAMPLE).save(APP / f'icon-{icon_hash()}-{size}.png', optimize=True)
 
     font = args.font or next(
         p for p in Path('~/Library/Fonts').expanduser().glob('*.ttf')
