@@ -1,5 +1,5 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=6';
-import * as store from './store.js?v=6';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=7';
+import * as store from './store.js?v=7';
 
 const $ = id => document.getElementById(id);
 const CAPTION_LIMIT = 2200;
@@ -75,7 +75,17 @@ async function showHome() {
   }
 }
 
+// Assets load in the background; drafts can be listed before they arrive.
+let ready = null;
+async function whenReady() {
+  if (!catalog) {
+    toast('표지 자원을 불러오는 중입니다…');
+    catalog = await ready;
+  }
+}
+
 async function newDraft() {
+  await whenReady();
   const comps = catalog.compositions;
   draft = {
     id: uid(), created: Date.now(), updated: Date.now(),
@@ -87,6 +97,7 @@ async function newDraft() {
 }
 
 async function openDraft(id) {
+  await whenReady();
   draft = await store.get(id);
   if (draft) openEditor();
 }
@@ -549,12 +560,8 @@ function wire() {
 
 (async () => {
   wire();
-  try {
-    catalog = await init();
-  } catch (e) {
-    toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
-    throw e;
-  }
+  ready = init();
+  ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   store.persist();
   showHome();
 })();
