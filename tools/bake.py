@@ -405,7 +405,7 @@ def main():
     if icon_src.exists():
         with Image.open(icon_src) as image:
             for size in (180, 512):
-                image.convert('RGB').resize((size, size), RESAMPLE).save(APP / f'icon-{icon_hash()}-{size}.png', optimize=True)
+                image.convert('RGB').resize((size, size), RESAMPLE).quantize(colors=32, method=Image.Quantize.MEDIANCUT).save(APP / f'icon-{icon_hash()}-{size}.png', optimize=True)
 
     font = args.font or next(
         p for p in Path('~/Library/Fonts').expanduser().glob('*.ttf')

@@ -362,7 +362,7 @@ def main():
         img = img.crop((18, 18, w - 18, w - 18)).resize((N, N), bake.RESAMPLE)
         img.save(bake.APP / 'icon-1024.png', optimize=True)
         for size in (180, 512):
-            img.resize((size, size), bake.RESAMPLE).save(bake.APP / f'icon-{bake.icon_hash()}-{size}.png', optimize=True)
+            img.resize((size, size), bake.RESAMPLE).quantize(colors=32, method=Image.Quantize.MEDIANCUT).save(bake.APP / f'icon-{bake.icon_hash()}-{size}.png', optimize=True)
         img.save(args.out / 'C6-navy-app.png', optimize=True)
         return
     if args.only == 'colors':
