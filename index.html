@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#e9edec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TTT">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+<title>TTT 게시물 준비</title>
+</head>
+<body>
+<main id="home" class="view">
+  <header class="top">
+    <div>
+      <p class="eyebrow">The Thinker's Toilet</p>
+      <h1>게시물 준비</h1>
+    </div>
+  </header>
+  <section class="card">
+    <div class="row between">
+      <h2>초안 <span id="draft-count" class="muted"></span></h2>
+      <button id="new-draft" class="primary">새 게시물</button>
+    </div>
+    <ul id="drafts" class="drafts"></ul>
+    <p id="empty" class="muted small" hidden>아직 초안이 없습니다. 새 게시물을 만들어 보세요.</p>
+  </section>
+  <p class="note">초안은 최대 3개까지 <strong>이 기기의 이 브라우저에만</strong> 저장됩니다. 서버나 iCloud로 보내지 않습니다. Safari가 오래 쓰지 않은 사이트의 데이터를 지울 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관할 수 있으니 한쪽만 쓰는 것을 권합니다. 사진 원본은 사진 앱에 그대로 있습니다.</p>
+</main>
+
+<main id="editor" class="view" hidden>
+  <header class="top sticky">
+    <button id="back" class="ghost">‹ 초안함</button>
+    <span id="saved" class="muted small"></span>
+  </header>
+
+  <section class="card">
+    <div class="preview-wrap"><canvas id="cover" class="preview" width="1080" height="1440" aria-label="표지 미리보기"></canvas></div>
+    <div class="row wrap">
+      <button id="shuffle-tiles" class="ghost">타일 섞기</button>
+      <button id="next-layout" class="ghost">배치 바꾸기</button>
+      <button id="random-all" class="ghost">아무거나</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>제목</h2>
+    <input id="title" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="한 언어로 제목 하나 (비우면 제목 없음)">
+    <div class="row between">
+      <span id="lang" class="muted small"></span>
+      <div id="direction" class="segmented" hidden>
+        <button data-v="0" class="on">가로</button><button data-v="1">세로</button>
+      </div>
+    </div>
+    <p id="title-warn" class="warn small" hidden>제목이 길어 타일에 들어가지 않습니다. 조금 줄여 주세요.</p>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <h2>표지 구성</h2>
+      <span id="comp-name" class="muted small"></span>
+    </div>
+    <div id="filters" class="chips">
+      <button data-k="" class="on">전체</button>
+      <button data-k="brush">붓</button>
+      <button data-k="geometric">기하학</button>
+      <button data-k="mixed">섞음</button>
+      <button data-k="truchet">트뤼셰</button>
+    </div>
+    <div id="compositions" class="comp-grid"></div>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <h2>본문 사진 <span id="photo-count" class="muted"></span></h2>
+      <label class="button ghost">사진 추가<input id="photo-input" type="file" accept="image/*" multiple hidden></label>
+    </div>
+    <p class="muted small">3:4로 맞춥니다. 테마는 넣지 않습니다. 사진은 이 기기 안에서만 처리합니다.</p>
+    <ol id="photos" class="photos"></ol>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <h2>캡션</h2>
+      <span id="caption-count" class="muted small">0 / 2,200</span>
+    </div>
+    <textarea id="caption" rows="7" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
+  </section>
+
+  <section class="card">
+    <h2>내보내기</h2>
+    <div class="stack">
+      <button id="export" class="primary">이미지 준비</button>
+      <button id="copy-caption" class="ghost">캡션 복사</button>
+      <button id="done" class="ghost">게시 완료 (초안 지우기)</button>
+      <button id="delete" class="danger ghost">초안 삭제</button>
+    </div>
+    <p id="export-status" class="muted small"></p>
+    <div id="fallback" class="fallback" hidden></div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>

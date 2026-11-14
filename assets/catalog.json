@@ -1,0 +1,555 @@
+{
+ "version": 1,
+ "canvas": [
+  1080,
+  1440
+ ],
+ "pitch": 90,
+ "picture": 5,
+ "title_length": 7,
+ "grout": "#dadede",
+ "pool": [
+  "#bfced7",
+  "#b0c3d0",
+  "#a1b9c9",
+  "#94adc0",
+  "#87a3b8",
+  "#7796b0",
+  "#66839f",
+  "#a1bdc2",
+  "#c9d5da"
+ ],
+ "weight": [
+  0.15,
+  0.14,
+  0.17,
+  0.16,
+  0.14,
+  0.105,
+  0.055,
+  0.05,
+  0.03
+ ],
+ "accents": [
+  "#ac8173",
+  "#c3a175"
+ ],
+ "glazes": {
+  "cream": {
+   "clay": "#e9e9db",
+   "ink": "#204576",
+   "accent": "#b66636",
+   "title_clay": "#e5e8df",
+   "title_ink": "#0a2848"
+  },
+  "sea": {
+   "clay": "#c4e2e1",
+   "ink": "#204670",
+   "accent": "#ba623a",
+   "title_clay": "#e0ebe6",
+   "title_ink": "#0b2a45"
+  },
+  "sand": {
+   "clay": "#eadac2",
+   "ink": "#8b3a2d",
+   "accent": "#d88249",
+   "title_clay": "#eaddc9",
+   "title_ink": "#5b211a"
+  },
+  "navy": {
+   "clay": "#1d4383",
+   "ink": "#fff0d6",
+   "accent": "#eab85d",
+   "title_clay": "#e4e8e2",
+   "title_ink": "#0c2b4a"
+  }
+ },
+ "tiles": {
+  "count": 120,
+  "columns": 12,
+  "size": 90
+ },
+ "glaze_filters": 8,
+ "compositions": [
+  {
+   "id": "01-ripple",
+   "name": "물결 고리",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/01-ripple.png",
+   "source": "v14",
+   "example": {
+    "title": "물이 잠잠해지는 시간",
+    "picture": [
+     2,
+     3
+    ],
+    "title_rect": [
+     8,
+     3,
+     1,
+     7
+    ]
+   },
+   "thumb": "thumbs/01-ripple.jpg"
+  },
+  {
+   "id": "02-window",
+   "name": "창가 트뤼셰",
+   "kind": "truchet",
+   "palette": "sea",
+   "picture": "pictures/02-window.png",
+   "source": "v14",
+   "example": {
+    "title": "Light through the kitchen window",
+    "picture": [
+     5,
+     7
+    ],
+    "title_rect": [
+     3,
+     5,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/02-window.jpg"
+  },
+  {
+   "id": "03-rain",
+   "name": "빗줄기",
+   "kind": "brush",
+   "palette": "cream",
+   "picture": "pictures/03-rain.png",
+   "source": "v14",
+   "example": {
+    "title": "빗소리가 들리는 저녁",
+    "picture": [
+     1,
+     6
+    ],
+    "title_rect": [
+     2,
+     4,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/03-rain.jpg"
+  },
+  {
+   "id": "04-low-tide",
+   "name": "썰물",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/04-low-tide.png",
+   "source": "v14",
+   "example": {
+    "title": "Low Tide",
+    "picture": [
+     5,
+     3
+    ],
+    "title_rect": [
+     4,
+     9,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/04-low-tide.jpg"
+  },
+  {
+   "id": "05-gap",
+   "name": "겹마름모",
+   "kind": "geometric",
+   "palette": "cream",
+   "picture": "pictures/05-gap.png",
+   "source": "v14",
+   "example": {
+    "title": "틈",
+    "picture": [
+     6,
+     6
+    ],
+    "title_rect": [
+     4,
+     4,
+     1,
+     7
+    ]
+   },
+   "thumb": "thumbs/05-gap.jpg"
+  },
+  {
+   "id": "06-daybreak",
+   "name": "사분원 무늬",
+   "kind": "truchet",
+   "palette": "cream",
+   "picture": "pictures/06-daybreak.png",
+   "source": "v14",
+   "example": {
+    "title": "The hour before the city wakes",
+    "picture": [
+     3,
+     6
+    ],
+    "title_rect": [
+     2,
+     4,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/06-daybreak.jpg"
+  },
+  {
+   "id": "07-sip",
+   "name": "마주 본 삼각",
+   "kind": "geometric",
+   "palette": "cream",
+   "picture": "pictures/07-sip.png",
+   "source": "v14",
+   "example": {
+    "title": "따뜻한 차를 한 모금",
+    "picture": [
+     2,
+     7
+    ],
+    "title_rect": [
+     8,
+     5,
+     1,
+     7
+    ]
+   },
+   "thumb": "thumbs/07-sip.jpg"
+  },
+  {
+   "id": "08-drift",
+   "name": "엇갈린 곡선",
+   "kind": "truchet",
+   "palette": "sea",
+   "picture": "pictures/08-drift.png",
+   "source": "v14",
+   "example": {
+    "title": "Drift",
+    "picture": [
+     5,
+     4
+    ],
+    "title_rect": [
+     2,
+     10,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/08-drift.jpg"
+  },
+  {
+   "id": "09-pebble",
+   "name": "두 겹 고리",
+   "kind": "geometric",
+   "palette": "cream",
+   "picture": "pictures/09-pebble.png",
+   "source": "v14",
+   "example": {
+    "title": "조약돌",
+    "picture": [
+     4,
+     7
+    ],
+    "title_rect": [
+     2,
+     5,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/09-pebble.jpg"
+  },
+  {
+   "id": "10-afterglow",
+   "name": "노을 별",
+   "kind": "geometric",
+   "palette": "sand",
+   "picture": "pictures/10-afterglow.png",
+   "source": "v14",
+   "example": {
+    "title": "The last of the afternoon light",
+    "picture": [
+     1,
+     4
+    ],
+    "title_rect": [
+     2,
+     10,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/10-afterglow.jpg"
+  },
+  {
+   "id": "11-breath",
+   "name": "숨 고르기",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/11-breath.png",
+   "source": "v14",
+   "example": {
+    "title": "숨을 고르는 사이",
+    "picture": [
+     6,
+     6
+    ],
+    "title_rect": [
+     4,
+     4,
+     1,
+     7
+    ]
+   },
+   "thumb": "thumbs/11-breath.jpg"
+  },
+  {
+   "id": "12-blue-hour",
+   "name": "달빛 원호",
+   "kind": "truchet",
+   "palette": "navy",
+   "picture": "pictures/12-blue-hour.png",
+   "source": "v14",
+   "example": {
+    "title": "Blue Hour",
+    "picture": [
+     4,
+     3
+    ],
+    "title_rect": [
+     3,
+     9,
+     7,
+     1
+    ]
+   },
+   "thumb": "thumbs/12-blue-hour.jpg"
+  },
+  {
+   "id": "gen-01",
+   "name": "조합 01",
+   "kind": "brush",
+   "palette": "navy",
+   "picture": "pictures/gen-01.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-01.jpg"
+  },
+  {
+   "id": "gen-02",
+   "name": "조합 02",
+   "kind": "geometric",
+   "palette": "sand",
+   "picture": "pictures/gen-02.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-02.jpg"
+  },
+  {
+   "id": "gen-03",
+   "name": "조합 03",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/gen-03.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-03.jpg"
+  },
+  {
+   "id": "gen-04",
+   "name": "조합 04",
+   "kind": "truchet",
+   "palette": "cream",
+   "picture": "pictures/gen-04.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-04.jpg"
+  },
+  {
+   "id": "gen-05",
+   "name": "조합 05",
+   "kind": "brush",
+   "palette": "cream",
+   "picture": "pictures/gen-05.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-05.jpg"
+  },
+  {
+   "id": "gen-06",
+   "name": "조합 06",
+   "kind": "geometric",
+   "palette": "cream",
+   "picture": "pictures/gen-06.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-06.jpg"
+  },
+  {
+   "id": "gen-07",
+   "name": "조합 07",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/gen-07.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-07.jpg"
+  },
+  {
+   "id": "gen-08",
+   "name": "조합 08",
+   "kind": "truchet",
+   "palette": "navy",
+   "picture": "pictures/gen-08.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-08.jpg"
+  },
+  {
+   "id": "gen-09",
+   "name": "조합 09",
+   "kind": "brush",
+   "palette": "cream",
+   "picture": "pictures/gen-09.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-09.jpg"
+  },
+  {
+   "id": "gen-10",
+   "name": "조합 10",
+   "kind": "geometric",
+   "palette": "sea",
+   "picture": "pictures/gen-10.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-10.jpg"
+  },
+  {
+   "id": "gen-11",
+   "name": "조합 11",
+   "kind": "mixed",
+   "palette": "sea",
+   "picture": "pictures/gen-11.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-11.jpg"
+  },
+  {
+   "id": "gen-12",
+   "name": "조합 12",
+   "kind": "truchet",
+   "palette": "cream",
+   "picture": "pictures/gen-12.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-12.jpg"
+  },
+  {
+   "id": "gen-13",
+   "name": "조합 13",
+   "kind": "brush",
+   "palette": "navy",
+   "picture": "pictures/gen-13.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-13.jpg"
+  },
+  {
+   "id": "gen-14",
+   "name": "조합 14",
+   "kind": "geometric",
+   "palette": "sand",
+   "picture": "pictures/gen-14.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-14.jpg"
+  },
+  {
+   "id": "gen-15",
+   "name": "조합 15",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/gen-15.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-15.jpg"
+  },
+  {
+   "id": "gen-16",
+   "name": "조합 16",
+   "kind": "truchet",
+   "palette": "cream",
+   "picture": "pictures/gen-16.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-16.jpg"
+  },
+  {
+   "id": "gen-17",
+   "name": "조합 17",
+   "kind": "brush",
+   "palette": "cream",
+   "picture": "pictures/gen-17.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-17.jpg"
+  },
+  {
+   "id": "gen-18",
+   "name": "조합 18",
+   "kind": "geometric",
+   "palette": "sand",
+   "picture": "pictures/gen-18.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-18.jpg"
+  },
+  {
+   "id": "gen-19",
+   "name": "조합 19",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/gen-19.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-19.jpg"
+  },
+  {
+   "id": "gen-20",
+   "name": "조합 20",
+   "kind": "truchet",
+   "palette": "navy",
+   "picture": "pictures/gen-20.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-20.jpg"
+  },
+  {
+   "id": "gen-21",
+   "name": "조합 21",
+   "kind": "brush",
+   "palette": "navy",
+   "picture": "pictures/gen-21.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-21.jpg"
+  },
+  {
+   "id": "gen-22",
+   "name": "조합 22",
+   "kind": "geometric",
+   "palette": "cream",
+   "picture": "pictures/gen-22.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-22.jpg"
+  },
+  {
+   "id": "gen-23",
+   "name": "조합 23",
+   "kind": "mixed",
+   "palette": "cream",
+   "picture": "pictures/gen-23.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-23.jpg"
+  },
+  {
+   "id": "gen-24",
+   "name": "조합 24",
+   "kind": "truchet",
+   "palette": "cream",
+   "picture": "pictures/gen-24.png",
+   "source": "generated",
+   "thumb": "thumbs/gen-24.jpg"
+  }
+ ]
+}
