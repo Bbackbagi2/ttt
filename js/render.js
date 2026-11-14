@@ -1,13 +1,15 @@
 // Cover renderer. Composites baked library layers on a 1080x1440 canvas.
 // Everything runs in the browser; no image or text leaves the device.
 
-const W = 1080, H = 1440, P = 90, SIDE = 450, LEN = 7;
+const W = 1080, H = 1440, P = 90, SIDE = 450, MAXLEN = 7;
 const COLS = 12, ROWS = 16;
 const FONT = 'TTTTitle';
+const GLASS = [214, 228, 230];   // pale blue-green tint of the window glass
+const FROST = .35;                // fixed semi-transparent glass
 
 let catalog = null;
 let atlas = null;           // ImageData of tiles.png
-const frames = {};          // plaque frames by orientation
+const frames = {};          // plaque frames by "orient-length"
 const glazes = {};          // glaze filter images by orientation
 const pictures = new Map(); // composition id -> ImageData
 
@@ -22,7 +24,7 @@ function loadImage(src) {
 
 function pixels(img) {
   const c = document.createElement('canvas');
-  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
   const g = c.getContext('2d', { willReadFrequently: true });
   g.drawImage(img, 0, 0);
   return g.getImageData(0, 0, c.width, c.height);
@@ -36,8 +38,13 @@ export async function init() {
     loadImage('assets/tiles.png').then(img => { atlas = pixels(img); }),
     font.load().then(f => document.fonts.add(f)),
   ];
-  for (const o of ['horizontal', 'vertical']) {
-    jobs.push(loadImage(`assets/plaque-${o}.png`).then(img => { frames[o] = pixels(img); }));
+  for (let n = 1; n <= MAXLEN; n++) {
+    jobs.push(loadImage(`assets/plaque/square-${n}.png`).then(img => { frames[`square-${n}`] = pixels(img); }));
+  }
+  for (const o of ['horizontal', 'vertical', 'square']) {
+    for (let n = 2; n <= MAXLEN && o !== 'square'; n++) {
+      jobs.push(loadImage(`assets/plaque/${o}-${n}.png`).then(img => { frames[`${o}-${n}`] = pixels(img); }));
+    }
     glazes[o] = [];
     for (let n = 1; n <= catalog.glaze_filters; n++) {
       jobs.push(loadImage(`assets/glaze/glaze-${String(n).padStart(2, '0')}-${o}.png`)
@@ -79,25 +86,43 @@ function permutation(n, rand) {
   return a;
 }
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
 export function language(text) {
   return /[ㄱ-ㆎ가-힣]/.test(text) ? 'ko' : 'en';
 }
 
-// Picture 5x5 and title 7x1 (or 1x7) with exactly one background tile between them.
-// Everything keeps one tile clear of the 1:1 / 4:5 / 3:4 crop edges.
-export function layouts(vertical) {
+// The cover spec, with defaults for drafts saved by older versions.
+export function normalize(spec) {
+  const text = (spec.title || '').trim();
+  const mode = spec.mode === 'window' ? 'window' : 'picture';
+  const win = Object.assign({ n: 5 }, spec.window || {}, { frost: FROST });
+  win.n = clamp(Math.round(win.n), 1, 7);
+  return {
+    mode, win, text,
+    vertical: language(text) === 'ko' && !!spec.vertical,
+    block: mode === 'window' ? win.n : 5,
+    length: clamp(Math.round(spec.titleLength || MAXLEN), 2, MAXLEN),
+    size: spec.titleSize ? clamp(spec.titleSize, 14, 80) : 0,
+  };
+}
+
+// A square block (picture 5x5, or window 1..7) and a title strip of 2..7 tiles,
+// with exactly one background tile between them. Everything keeps one tile clear
+// of the 1:1 / 4:5 / 3:4 crop edges.
+export function layouts(vertical, block = 5, length = MAXLEN) {
   const out = [];
-  for (let py = 3; py <= 8; py++) {
-    for (let px = 1; px <= 6; px++) {
+  for (let py = 3; py + block <= 13; py++) {
+    for (let px = 1; px + block <= 11; px++) {
       if (!vertical) {
-        const tx = Math.min(4, Math.max(1, px - 1));
-        for (const ty of [py + 6, py - 2]) {
-          if (ty >= 3 && ty <= 12) out.push({ picture: [px, py], title: [tx, ty, LEN, 1] });
+        const tx = clamp(px + Math.round((block - length) / 2), 1, 11 - length);
+        for (const ty of [py + block + 1, py - 2]) {
+          if (ty >= 3 && ty <= 12) out.push({ picture: [px, py], title: [tx, ty, length, 1] });
         }
       } else {
-        const ty = Math.min(6, Math.max(3, py - 1));
-        for (const tx of [px + 6, px - 2]) {
-          if (tx >= 1 && tx <= 10) out.push({ picture: [px, py], title: [tx, ty, 1, LEN] });
+        const ty = clamp(py + Math.round((block - length) / 2), 3, 13 - length);
+        for (const tx of [px + block + 1, px - 2]) {
+          if (tx >= 1 && tx <= 10) out.push({ picture: [px, py], title: [tx, ty, 1, length] });
         }
       }
     }
@@ -105,16 +130,28 @@ export function layouts(vertical) {
   // Prefer arrangements whose whole block sits near the middle of the wall.
   const score = l => {
     const [px, py] = l.picture, [tx, ty, tw, th] = l.title;
-    const x0 = Math.min(px, tx), x1 = Math.max(px + 5, tx + tw);
-    const y0 = Math.min(py, ty), y1 = Math.max(py + 5, ty + th);
+    const x0 = Math.min(px, tx), x1 = Math.max(px + block, tx + tw);
+    const y0 = Math.min(py, ty), y1 = Math.max(py + block, ty + th);
     return Math.abs((x0 + x1) / 2 - 6) + Math.abs((y0 + y1) / 2 - 8) * .8;
   };
   return out.sort((a, b) => score(a) - score(b));
 }
 
+// Index of the layout that moves the block one tile in (dx, dy), keeping the title side.
+export function nudge(spec, dx, dy) {
+  const s = normalize(spec);
+  const list = layouts(s.vertical, s.block, s.length);
+  const cur = list[((spec.layout || 0) % list.length + list.length) % list.length];
+  const side = l => (s.vertical ? Math.sign(l.title[0] - l.picture[0]) : Math.sign(l.title[1] - l.picture[1]));
+  const want = [cur.picture[0] + dx, cur.picture[1] + dy];
+  let best = list.findIndex(l => l.picture[0] === want[0] && l.picture[1] === want[1] && side(l) === side(cur));
+  if (best < 0) best = list.findIndex(l => l.picture[0] === want[0] && l.picture[1] === want[1]);
+  return best;
+}
+
 // ---------------------------------------------------------------- title
 
-function measureGlyphs(chars, size, vertical, ctx) {
+function measureGlyphs(chars, size, ctx) {
   ctx.font = `${size}px ${FONT}`;
   return chars.map(c => {
     const m = ctx.measureText(c);
@@ -127,8 +164,9 @@ function measureGlyphs(chars, size, vertical, ctx) {
   });
 }
 
-// Returns null when the title cannot fit at the smallest size.
-export function fitTitle(text, vertical) {
+// Auto size: the largest size that fits. Manual size: that size, flagged when it overflows.
+// Returns null only for an empty title or an auto title that cannot fit.
+export function fitTitle(text, vertical, length = MAXLEN, manual = 0) {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (!words.length) return null;
   const wordEnds = new Set();
@@ -139,19 +177,22 @@ export function fitTitle(text, vertical) {
   const weights = glyphChars.slice(0, -1).map((_, i) => (wordEnds.has(i) ? weight : 1));
   const sumW = weights.reduce((a, b) => a + b, 0);
   const wordy = words.length >= 3;
-  const target = wordy ? 486 : 523;
+  const tile = length * P;
+  const target = Math.round(tile * (wordy ? .77 : .83));
   const ctx = document.createElement('canvas').getContext('2d');
-  for (let size = 45; size >= 18; size--) {
-    const g = measureGlyphs(glyphChars, size, vertical, ctx);
+  const sizes = manual ? [manual] : Array.from({ length: 28 }, (_, i) => 45 - i);
+  for (const size of sizes) {
+    const g = measureGlyphs(glyphChars, size, ctx);
     const ink = g.reduce((a, b) => a + (vertical ? b.height : b.width), 0);
     const cross = vertical ? Math.max(...g.map(x => x.width))
       : Math.max(...g.map(x => x.ascent)) + Math.max(...g.map(x => x.descent));
-    if (cross > 30) continue;
     let gap;
     if (!sumW) gap = 0;
-    else if (wordy) { gap = (target - ink) / sumW; if (gap < 2.5) continue; }
-    else { gap = Math.min(19, Math.max(4, (target - ink) / sumW)); if (ink + gap * sumW > target + 2) continue; }
-    return { size, glyphs: g, gaps: weights.map(w => w * gap), ink, span: ink + gap * sumW, vertical };
+    else if (wordy) gap = Math.max(manual ? 2 : 0, (target - ink) / sumW);
+    else gap = clamp((target - ink) / sumW, manual ? 2 : 4, 19);
+    const span = ink + gap * sumW;
+    const fits = cross <= (manual ? 62 : 30) && span <= (manual ? tile - 28 : target + 2) && (!!manual || !wordy || gap >= 2.5);
+    if (fits || manual) return { size, glyphs: g, gaps: weights.map(w => w * gap), ink, span, vertical, fits };
   }
   return null;
 }
@@ -182,8 +223,7 @@ function drawTitle(fit, ink, w, h) {
   return c;
 }
 
-function plaque(fit, colors, orient, rand) {
-  const [w, h] = orient === 'horizontal' ? [LEN * P, P] : [P, LEN * P];
+function plaque(fit, colors, orient, w, h, rand) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true });
@@ -192,21 +232,80 @@ function plaque(fit, colors, orient, rand) {
   if (fit) g.drawImage(drawTitle(fit, colors.title_ink, w, h), 0, 0);
   // The glaze lies over the lettering so the title reads as fired under it.
   const list = glazes[orient];
+  const glaze = list[Math.floor(rand() * list.length)];
   g.globalAlpha = .88;
-  g.drawImage(list[Math.floor(rand() * list.length)], 0, 0);
+  g.drawImage(glaze, 0, 0, w, h, 0, 0, w, h);
   g.globalAlpha = 1;
   return g.getImageData(0, 0, w, h);
 }
 
+// ---------------------------------------------------------------- window
+
+// One glass pane of n x n small-tile units. It is a hole in the wall: behind it is the
+// next slide (the first body photo, already fitted to 1080x1440) at the very same place,
+// so swiping from the cover to the photo continues the view.
+function windowPane(behind, x0, y0, n, frost, rand) {
+  const S = n * P;
+  const pane = document.createElement('canvas');
+  pane.width = pane.height = S;
+  const g = pane.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingQuality = 'high';
+  if (behind) {
+    g.drawImage(behind, x0, y0, S, S, 0, 0, S, S);
+  } else {
+    g.fillStyle = '#c8d6da';
+    g.fillRect(0, 0, S, S);
+  }
+  frost = clamp(frost, 0, 1);
+  if (frost > 0) {
+    // A strong downscale and smooth upscale stands in for a blur.
+    const small = document.createElement('canvas');
+    small.width = small.height = Math.max(4, Math.round(S / 14));
+    const sg = small.getContext('2d');
+    sg.imageSmoothingQuality = 'high';
+    sg.drawImage(pane, 0, 0, small.width, small.height);
+    g.globalAlpha = frost;
+    g.drawImage(small, 0, 0, S, S);
+    g.globalAlpha = 1;
+  }
+  g.fillStyle = `rgba(${GLASS.join(',')},${.06 + .25 * frost})`;
+  g.fillRect(0, 0, S, S);
+  // A transparent glaze from the tile photographs gives the glass its surface.
+  const list = glazes.square;
+  g.globalAlpha = .32 + .3 * frost;
+  g.drawImage(list[Math.floor(rand() * list.length)], 0, 0, S, S);
+  g.globalAlpha = 1;
+  return g.getImageData(0, 0, S, S);
+}
+
+// Layout index that puts the block at (px, py), keeping the title on the same side if possible.
+export function locate(spec, px, py) {
+  const s = normalize(spec);
+  const list = layouts(s.vertical, s.block, s.length);
+  const cur = list[((spec.layout || 0) % list.length + list.length) % list.length];
+  const side = l => (s.vertical ? Math.sign(l.title[0] - l.picture[0]) : Math.sign(l.title[1] - l.picture[1]));
+  let best = list.findIndex(l => l.picture[0] === px && l.picture[1] === py && side(l) === side(cur));
+  if (best < 0) best = list.findIndex(l => l.picture[0] === px && l.picture[1] === py);
+  return best;
+}
+
+// Converts a point on the cover to the window's photo framing, for drag-to-pan.
+export function windowFrame(spec) {
+  const s = normalize(spec);
+  if (s.mode !== 'window') return null;
+  const list = layouts(s.vertical, s.block, s.length);
+  const l = list[((spec.layout || 0) % list.length + list.length) % list.length];
+  return { x: l.picture[0] * P, y: l.picture[1] * P, size: s.block * P };
+}
+
 // ---------------------------------------------------------------- cover
 
-export async function render(canvas, spec) {
+export async function render(canvas, spec, extra = {}) {
   await init();
+  const s = normalize(spec);
   const item = catalog.compositions.find(c => c.id === spec.composition) || catalog.compositions[0];
-  const colors = catalog.glazes[item.palette];
-  const text = (spec.title || '').trim();
-  const vertical = language(text) === 'ko' && !!spec.vertical;
-  const options = layouts(vertical);
+  const colors = catalog.glazes[s.mode === 'window' ? 'cream' : item.palette];
+  const options = layouts(s.vertical, s.block, s.length);
   const layout = options[((spec.layout || 0) % options.length + options.length) % options.length];
   const rand = rng(spec.seed || 1);
   const grout = hex(catalog.grout);
@@ -215,8 +314,8 @@ export async function render(canvas, spec) {
   const [tx, ty, tw, th] = layout.title;
   const reserved = new Set();
   const mark = (x, y, w, h) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) reserved.add(j * COLS + i); };
-  mark(px, py, 5, 5);
-  if (text) mark(tx, ty, tw, th);
+  mark(px, py, s.block, s.block);
+  if (s.text) mark(tx, ty, tw, th);
 
   // Background glaze pattern and photographed tile assignment.
   const pool = catalog.pool.map(hex), cum = [];
@@ -233,6 +332,7 @@ export async function render(canvas, spec) {
   const count = catalog.tiles.count;
   let ids = [];
   while (ids.length < ROWS * COLS) ids = ids.concat(permutation(count, rand));
+
 
   const out = new ImageData(W, H);
   const d = out.data;
@@ -252,10 +352,10 @@ export async function render(canvas, spec) {
           const shadow = Math.min(0, reflect), hi = Math.max(0, reflect);
           const m = 1 - mask, mortar = 10 * depth;
           for (let ch = 0; ch < 3; ch++) {
-            let s = glaze[ch] + shadow;
-            s = s < 0 ? 0 : s > 255 ? 255 : s;
-            s = s + (252 - s) * (hi / 255) * .9 + .36 * hi;
-            d[di + ch] = s * mask + (grout[ch] - mortar) * m;
+            let v = glaze[ch] + shadow;
+            v = v < 0 ? 0 : v > 255 ? 255 : v;
+            v = v + (252 - v) * (hi / 255) * .9 + .36 * hi;
+            d[di + ch] = v * mask + (grout[ch] - mortar) * m;
           }
           d[di + 3] = 255;
         }
@@ -263,21 +363,37 @@ export async function render(canvas, spec) {
     }
   }
 
-  // Picture tile.
-  const pic = await picture(item);
-  for (let y = 0; y < SIDE; y++) {
-    const src = pic.data.subarray(y * SIDE * 4, (y + 1) * SIDE * 4);
-    d.set(src, ((py * P + y) * W + px * P) * 4);
+  // Picture tile, or the window pane set in the wall like one large tile.
+  if (s.mode === 'picture') {
+    const pic = await picture(item);
+    for (let y = 0; y < SIDE; y++) {
+      d.set(pic.data.subarray(y * SIDE * 4, (y + 1) * SIDE * 4), ((py * P + y) * W + px * P) * 4);
+    }
+  } else {
+    const pane = windowPane(extra.behind, px * P, py * P, s.block, s.win.frost, rand);
+    const frame = frames[`square-${s.block}`];
+    const S = s.block * P;
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const fi = (y * S + x) * 4;
+        const tile = frame.data[fi] / 255, depth = frame.data[fi + 2] / 255;
+        const di = ((py * P + y) * W + px * P + x) * 4;
+        for (let ch = 0; ch < 3; ch++) {
+          d[di + ch] = pane.data[fi + ch] * tile + (grout[ch] - 10 * depth) * (1 - tile);
+        }
+        d[di + 3] = 255;
+      }
+    }
   }
 
   // Title plaque.
   let fit = null;
-  if (text) {
-    fit = fitTitle(text, vertical);
-    const orient = vertical ? 'vertical' : 'horizontal';
-    const face = plaque(fit, colors, orient, rand);
-    const frame = frames[orient];
+  if (s.text) {
+    fit = fitTitle(s.text, s.vertical, s.length, s.size);
+    const orient = s.vertical ? 'vertical' : 'horizontal';
     const w = tw * P, h = th * P;
+    const face = plaque(fit, colors, orient, w, h, rand);
+    const frame = frames[`${orient}-${s.length}`];
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const fi = (y * w + x) * 4;
@@ -304,7 +420,10 @@ export async function render(canvas, spec) {
 
   canvas.width = W; canvas.height = H;
   canvas.getContext('2d').putImageData(out, 0, 0);
-  return { layouts: options.length, fits: !text || !!fit, item };
+  return {
+    layouts: options.length, item, mode: s.mode,
+    fits: !s.text || (!!fit && fit.fits), titleSize: fit ? fit.size : 0,
+  };
 }
 
 // Body photo prepared at 3:4 without any theme.
@@ -322,4 +441,4 @@ export function preparePhoto(img, fit, background = '#ffffff') {
   return c;
 }
 
-export const SIZE = { W, H };
+export const SIZE = { W, H, P };

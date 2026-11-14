@@ -340,13 +340,25 @@ def main():
     # Title plaque frame: one large tile whose bevel follows the small photographed tile.
     edge = Image.new('L', (160, 160))
     ImageDraw.Draw(edge).rounded_rectangle((5, 5, 154, 154), radius=4, fill=255)
-    for orient, size in (('horizontal', (LENGTH * PITCH, PITCH)), ('vertical', (PITCH, LENGTH * PITCH))):
+    (OUT / 'plaque').mkdir(exist_ok=True)
+    for orient in ('horizontal', 'vertical'):
+        for length in range(2, LENGTH + 1):
+            size = (length * PITCH, PITCH) if orient == 'horizontal' else (PITCH, length * PITCH)
+            tile = np.clip(slice_texture(np.asarray(edge, dtype=float) / 255, size), 0, 1)
+            depth = gaussian_filter(np.roll(tile, (3, 3), axis=(0, 1)), 1.25)
+            frame = np.dstack((tile * 255, tile * 255, depth * 255))
+            Image.fromarray(np.uint8(np.round(frame))).save(OUT / 'plaque' / f'{orient}-{length}.png', optimize=True)
+        for n in range(1, 9):
+            shutil.copy(libraries / 'glaze-filters' / f'glaze-{n:02d}-{orient}.png', OUT / 'glaze')
+    # Window pane: one large tile of n x n small-tile units, no inner grout.
+    for n in range(1, 9):
+        shutil.copy(libraries / 'glaze-filters' / f'glaze-{n:02d}-square.png', OUT / 'glaze')
+    for units in range(1, 8):
+        size = (units * PITCH, units * PITCH)
         tile = np.clip(slice_texture(np.asarray(edge, dtype=float) / 255, size), 0, 1)
         depth = gaussian_filter(np.roll(tile, (3, 3), axis=(0, 1)), 1.25)
         frame = np.dstack((tile * 255, tile * 255, depth * 255))
-        Image.fromarray(np.uint8(np.round(frame))).save(OUT / f'plaque-{orient}.png', optimize=True)
-        for n in range(1, 9):
-            shutil.copy(libraries / 'glaze-filters' / f'glaze-{n:02d}-{orient}.png', OUT / 'glaze')
+        Image.fromarray(np.uint8(np.round(frame))).save(OUT / 'plaque' / f'square-{units}.png', optimize=True)
 
     # v14 picture tiles, with the wall light removed so the phone can relight them in a new place.
     covers = project / 'TTT-cover-study-v14-brushed-geometry' / 'covers'
@@ -380,10 +392,12 @@ def main():
         with Image.open(OUT / item['picture']) as image:
             image.convert('RGB').resize((180, 180), RESAMPLE).save(OUT / 'thumbs' / f"{item['id']}.jpg", quality=86)
         item['thumb'] = f"thumbs/{item['id']}.jpg"
-    with Image.open(OUT / 'pictures' / '12-blue-hour.png') as image:
-        icon = image.convert('RGB').crop((14, 14, SIDE - 14, SIDE - 14))
-        for size in (180, 512):
-            icon.resize((size, size), RESAMPLE).save(APP / f'icon-{size}.png', optimize=True)
+    # Home-screen icons come from icon-1024.png (chosen design), not from this bake.
+    icon_src = APP / 'icon-1024.png'
+    if icon_src.exists():
+        with Image.open(icon_src) as image:
+            for size in (180, 512):
+                image.convert('RGB').resize((size, size), RESAMPLE).save(APP / f'icon-{size}.png', optimize=True)
 
     font = args.font or next(
         p for p in Path('~/Library/Fonts').expanduser().glob('*.ttf')

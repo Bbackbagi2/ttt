@@ -5,108 +5,203 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#e9edec">
+<meta name="theme-color" content="#1b2328">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="TTT">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css">
-<title>TTT 게시물 준비</title>
+<link rel="stylesheet" href="style.css?v=6">
+<title>TTT</title>
 </head>
 <body>
-<main id="home" class="view">
-  <header class="top">
-    <div>
-      <p class="eyebrow">The Thinker's Toilet</p>
-      <h1>게시물 준비</h1>
-    </div>
+
+<!-- Line icons, 24px grid, drawn with the current text colour. -->
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/><path d="M14 7h6M17 4v6"/><path d="M4 17h6"/></symbol>
+  <symbol id="i-layout" viewBox="0 0 24 24"><rect x="4" y="4" width="9" height="9" rx="1.5"/><path d="M4 18h9"/><path d="M17 6v12M17 18l3-3M17 18l-3-3"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r=".9" class="fill"/><circle cx="15" cy="15" r=".9" class="fill"/><circle cx="15" cy="9" r=".9" class="fill"/><circle cx="9" cy="15" r=".9" class="fill"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 18V6M6 12l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 6v12M6 12l6 6 6-6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M18 12H6M12 6l-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M6 12h12M12 6l6 6-6 6"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
+  <symbol id="i-cover" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="8.5" y="7" width="7" height="7" rx="1"/><path d="M8.5 17h7"/></symbol>
+  <symbol id="i-title" viewBox="0 0 24 24"><path d="M5 6h14M12 6v13"/></symbol>
+  <symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 2-2 4 4"/></symbol>
+  <symbol id="i-caption" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></symbol>
+  <symbol id="i-add" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M12 9v7M8.5 12.5h7"/></symbol>
+  <symbol id="i-fill" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 9h14M5 15h14"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="7.5" y="8" width="9" height="8" rx="1"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-picture" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15c2-4 6-4 8 0"/><circle cx="12" cy="9" r="1.2"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1" class="soft"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+</svg>
+
+<!-- ============================================================ home -->
+<main id="home" class="home">
+  <header class="home-head">
+    <p class="eyebrow">The Thinker's Toilet</p>
+    <h1>Posts</h1>
   </header>
-  <section class="card">
-    <div class="row between">
-      <h2>초안 <span id="draft-count" class="muted"></span></h2>
-      <button id="new-draft" class="primary">새 게시물</button>
+
+  <section>
+    <div class="section-head">
+      <span class="label">초안</span>
+      <span id="draft-count" class="count"></span>
     </div>
     <ul id="drafts" class="drafts"></ul>
-    <p id="empty" class="muted small" hidden>아직 초안이 없습니다. 새 게시물을 만들어 보세요.</p>
+    <p id="empty" class="empty" hidden>아직 초안이 없습니다.</p>
+    <button id="new-draft" class="btn primary wide"><svg class="ic"><use href="#i-plus"/></svg>New post</button>
   </section>
-  <p class="note">초안은 최대 3개까지 <strong>이 기기의 이 브라우저에만</strong> 저장됩니다. 서버나 iCloud로 보내지 않습니다. Safari가 오래 쓰지 않은 사이트의 데이터를 지울 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관할 수 있으니 한쪽만 쓰는 것을 권합니다. 사진 원본은 사진 앱에 그대로 있습니다.</p>
+
+  <details class="note">
+    <summary>초안은 어디에 저장되나요?</summary>
+    <p>초안은 최대 3개까지 <strong>이 기기의 이 브라우저에만</strong> 저장됩니다. 서버나 iCloud로 보내지 않습니다. Safari가 오래 쓰지 않은 사이트의 데이터를 지울 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관할 수 있으니 한쪽만 쓰는 것을 권합니다. 사진 원본은 사진 앱에 그대로 있습니다.</p>
+  </details>
 </main>
 
-<main id="editor" class="view" hidden>
-  <header class="top sticky">
-    <button id="back" class="ghost">‹ 초안함</button>
-    <span id="saved" class="muted small"></span>
+<!-- ============================================================ editor -->
+<main id="editor" class="editor" hidden>
+  <header class="bar">
+    <button id="back" class="icon-btn" aria-label="Back to drafts"><svg class="ic"><use href="#i-back"/></svg></button>
+    <span id="saved" class="saved"></span>
+    <div class="history" role="group" aria-label="History">
+      <button id="undo" class="icon-btn" aria-label="Undo" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
+      <button id="redo" class="icon-btn" aria-label="Redo" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
+    </div>
   </header>
 
-  <section class="card">
-    <div class="preview-wrap"><canvas id="cover" class="preview" width="1080" height="1440" aria-label="표지 미리보기"></canvas></div>
-    <div class="row wrap">
-      <button id="shuffle-tiles" class="ghost">타일 섞기</button>
-      <button id="next-layout" class="ghost">배치 바꾸기</button>
-      <button id="random-all" class="ghost">아무거나</button>
-    </div>
-  </section>
+  <div class="stage">
+    <canvas id="cover" class="preview" width="1080" height="1440" aria-label="Cover preview"></canvas>
+  </div>
 
-  <section class="card">
-    <h2>제목</h2>
-    <input id="title" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="한 언어로 제목 하나 (비우면 제목 없음)">
-    <div class="row between">
-      <span id="lang" class="muted small"></span>
-      <div id="direction" class="segmented" hidden>
-        <button data-v="0" class="on">가로</button><button data-v="1">세로</button>
+  <div class="panels">
+    <!-- cover -->
+    <section data-panel="cover" class="panel">
+      <div id="mode" class="segmented">
+        <button data-m="picture" class="on"><svg class="ic sm"><use href="#i-picture"/></svg>Picture</button>
+        <button data-m="window"><svg class="ic sm"><use href="#i-window"/></svg>Window</button>
       </div>
-    </div>
-    <p id="title-warn" class="warn small" hidden>제목이 길어 타일에 들어가지 않습니다. 조금 줄여 주세요.</p>
-  </section>
 
-  <section class="card">
-    <div class="row between">
-      <h2>표지 구성</h2>
-      <span id="comp-name" class="muted small"></span>
-    </div>
-    <div id="filters" class="chips">
-      <button data-k="" class="on">전체</button>
-      <button data-k="brush">붓</button>
-      <button data-k="geometric">기하학</button>
-      <button data-k="mixed">섞음</button>
-      <button data-k="truchet">트뤼셰</button>
-    </div>
-    <div id="compositions" class="comp-grid"></div>
-  </section>
+      <div class="arrange">
+        <div class="dpad" aria-label="Move">
+          <button data-dx="0" data-dy="-1" class="n" aria-label="Up"><svg class="ic"><use href="#i-up"/></svg></button>
+          <button data-dx="-1" data-dy="0" class="w" aria-label="Left"><svg class="ic"><use href="#i-left"/></svg></button>
+          <span class="hub"></span>
+          <button data-dx="1" data-dy="0" class="e" aria-label="Right"><svg class="ic"><use href="#i-right"/></svg></button>
+          <button data-dx="0" data-dy="1" class="s" aria-label="Down"><svg class="ic"><use href="#i-down"/></svg></button>
+        </div>
+        <div class="actions">
+          <button id="next-layout" class="act"><svg class="ic"><use href="#i-layout"/></svg>Layout</button>
+          <button id="shuffle-tiles" class="act"><svg class="ic"><use href="#i-shuffle"/></svg>Tiles</button>
+          <button id="random-all" class="act"><svg class="ic"><use href="#i-dice"/></svg>Random</button>
+        </div>
+      </div>
 
-  <section class="card">
-    <div class="row between">
-      <h2>본문 사진 <span id="photo-count" class="muted"></span></h2>
-      <label class="button ghost">사진 추가<input id="photo-input" type="file" accept="image/*" multiple hidden></label>
-    </div>
-    <p class="muted small">3:4로 맞춥니다. 테마는 넣지 않습니다. 사진은 이 기기 안에서만 처리합니다.</p>
-    <ol id="photos" class="photos"></ol>
-  </section>
+      <div id="picture-panel" class="group">
+        <div class="group-head">
+          <span class="label">그림</span>
+          <span id="comp-name" class="hint"></span>
+        </div>
+        <div id="filters" class="chips">
+          <button data-k="" class="on">All</button>
+          <button data-k="brush">Brush</button>
+          <button data-k="geometric">Geometric</button>
+          <button data-k="mixed">Mixed</button>
+          <button data-k="truchet">Truchet</button>
+        </div>
+        <div id="compositions" class="comp-grid"></div>
+      </div>
 
-  <section class="card">
-    <div class="row between">
-      <h2>캡션</h2>
-      <span id="caption-count" class="muted small">0 / 2,200</span>
-    </div>
-    <textarea id="caption" rows="7" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
-  </section>
+      <div id="window-panel" class="group" hidden>
+        <div class="row">
+          <span class="label">창 크기</span>
+          <div class="stepper" data-for="win-n"><button data-d="-1" aria-label="Smaller"><svg class="ic sm"><use href="#i-minus"/></svg></button><output id="win-n-out"></output><button data-d="1" aria-label="Larger"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
+          <input id="win-n" type="range" min="1" max="7" step="1" hidden>
+        </div>
+        <p class="hint">창은 벽에 뚫린 반투명 유리 구멍입니다. 다음 장(본문 첫 사진)의 같은 자리가 보여서, 표지에서 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
+        <p id="window-nophoto" class="warn" hidden>본문 사진이 아직 없습니다. Photos 탭에서 추가하면 첫 장이 창 너머로 보입니다.</p>
+      </div>
+    </section>
 
-  <section class="card">
-    <h2>내보내기</h2>
-    <div class="stack">
-      <button id="export" class="primary">이미지 준비</button>
-      <button id="copy-caption" class="ghost">캡션 복사</button>
-      <button id="done" class="ghost">게시 완료 (초안 지우기)</button>
-      <button id="delete" class="danger ghost">초안 삭제</button>
-    </div>
-    <p id="export-status" class="muted small"></p>
-    <div id="fallback" class="fallback" hidden></div>
-  </section>
+    <!-- title -->
+    <section data-panel="title" class="panel" hidden>
+      <input id="title" class="text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="제목을 적어 주세요">
+      <p id="lang" class="hint"></p>
+      <p id="title-warn" class="warn" hidden>제목이 타일에 들어가지 않습니다. 제목을 줄이거나, 타일을 늘리거나, 글자를 줄여 주세요.</p>
+      <div class="group">
+        <div class="row" id="direction-field">
+          <span class="label">방향</span>
+          <div id="direction" class="segmented compact">
+            <button data-v="0" class="on">Horizontal</button><button data-v="1">Vertical</button>
+          </div>
+        </div>
+        <div class="row">
+          <span class="label">타일 길이</span>
+          <div class="stepper" data-for="title-length"><button data-d="-1" aria-label="Shorter"><svg class="ic sm"><use href="#i-minus"/></svg></button><output id="length-out"></output><button data-d="1" aria-label="Longer"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
+          <input id="title-length" type="range" min="2" max="7" step="1" hidden>
+        </div>
+        <div class="row">
+          <span class="label">글자 크기</span>
+          <div class="segmented compact" id="size-mode">
+            <button id="size-auto" class="on">Auto</button><button id="size-manual">Manual</button>
+          </div>
+        </div>
+        <label class="slider" id="size-slider"><input id="title-size" type="range" min="14" max="80" step="1"><output id="size-out"></output></label>
+      </div>
+    </section>
+
+    <!-- photos -->
+    <section data-panel="photos" class="panel" hidden>
+      <label class="btn wide"><svg class="ic"><use href="#i-add"/></svg>Add photos<input id="photo-input" type="file" accept="image/*" multiple hidden></label>
+      <p class="hint">표지 다음 장에 순서대로 들어갑니다. 테마 없이 3:4로 맞추며, 사진은 이 기기 안에서만 처리합니다.</p>
+      <ol id="photos" class="photos"></ol>
+    </section>
+
+    <!-- caption -->
+    <section data-panel="caption" class="panel" hidden>
+      <textarea id="caption" rows="8" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
+      <div class="row">
+        <span id="caption-count" class="hint">0 / 2,200</span>
+        <button id="copy-caption-2" class="btn"><svg class="ic sm"><use href="#i-copy"/></svg>Copy</button>
+      </div>
+    </section>
+
+    <!-- export -->
+    <section data-panel="export" class="panel" hidden>
+      <div class="group">
+        <button id="export" class="btn primary wide"><svg class="ic"><use href="#i-export"/></svg><span id="export-label">Prepare images</span></button>
+        <p id="export-status" class="hint"></p>
+        <div id="fallback" class="fallback" hidden></div>
+        <button id="copy-caption" class="btn wide"><svg class="ic"><use href="#i-copy"/></svg>Copy caption</button>
+        <button id="done" class="btn wide"><svg class="ic"><use href="#i-check"/></svg>Mark as posted</button>
+      </div>
+      <button id="delete" class="btn quiet wide"><svg class="ic sm"><use href="#i-trash"/></svg>Delete draft</button>
+    </section>
+  </div>
+
+  <nav id="tabs" class="tabbar" role="tablist">
+    <button data-tab="cover" class="on" role="tab"><svg class="ic"><use href="#i-cover"/></svg>Cover</button>
+    <button data-tab="title" role="tab"><svg class="ic"><use href="#i-title"/></svg>Title</button>
+    <button data-tab="photos" role="tab"><svg class="ic"><use href="#i-photos"/></svg>Photos<span id="photo-count" class="badge"></span></button>
+    <button data-tab="caption" role="tab"><svg class="ic"><use href="#i-caption"/></svg>Caption</button>
+    <button data-tab="export" role="tab"><svg class="ic"><use href="#i-export"/></svg>Export</button>
+  </nav>
 </main>
 
 <div id="toast" class="toast" hidden></div>
-<script type="module" src="js/app.js?v=1"></script>
+<script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

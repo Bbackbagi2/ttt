@@ -1,5 +1,5 @@
-import { init, render, language, layouts, preparePhoto } from './render.js?v=1';
-import * as store from './store.js?v=1';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=6';
+import * as store from './store.js?v=6';
 
 const $ = id => document.getElementById(id);
 const CAPTION_LIMIT = 2200;
@@ -7,6 +7,11 @@ let catalog = null;
 let draft = null;
 let filter = '';
 let prepared = null;          // files ready to share for the current draft state
+let history = [];             // cover settings before each change, for undo
+let future = [];              // settings undone, for redo
+let lastCheck = { key: '', time: 0 };
+let behind = { key: null, canvas: null };   // first body photo fitted to 3:4, seen through the window
+const COVER_KEYS = ['composition', 'seed', 'layout', 'vertical', 'mode', 'window', 'titleLength', 'titleSize'];
 const urls = new Set();
 
 function url(blob) { const u = URL.createObjectURL(blob); urls.add(u); return u; }
@@ -62,7 +67,8 @@ async function showHome() {
     const when = new Date(d.updated);
     info.textContent = `사진 ${d.photos.length}장 · ${when.getMonth() + 1}월 ${when.getDate()}일 ${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')} 수정`;
     meta.append(strong, info);
-    b.append(img, meta);
+    const chev = icon('chev', 'ic sm chev');
+    b.append(img, meta, chev);
     b.addEventListener('click', () => openDraft(d.id));
     li.append(b);
     list.append(li);
@@ -98,17 +104,92 @@ function openEditor() {
   $('fallback').hidden = true;
   $('export-status').textContent = '';
   $('saved').textContent = '';
-  syncDirection();
+  history = [];
+  future = [];
+  lastCheck = { key: '', time: 0 };
+  behind = { key: null, canvas: null };
+  showTab('cover');
+  syncControls();
   renderCompositions();
   renderPhotos();
   updateCaptionCount();
   schedule();
 }
 
+// ---------------------------------------------------------------- undo
+
+function snapshot() {
+  return JSON.stringify(Object.fromEntries(COVER_KEYS.map(k => [k, draft[k] ?? null])));
+}
+
+// Records the settings before a change. Rapid repeats of one control (a slider drag) count once.
+function checkpoint(key) {
+  const now = Date.now();
+  if (key === lastCheck.key && now - lastCheck.time < 900) { lastCheck.time = now; return; }
+  lastCheck = { key, time: now };
+  const snap = snapshot();
+  if (history[history.length - 1] !== snap) history.push(snap);
+  if (history.length > 60) history.shift();
+  future = [];
+  syncHistory();
+}
+
+function travel(from, to) {
+  const snap = from.pop();
+  if (!snap) return;
+  to.push(snapshot());
+  Object.assign(draft, JSON.parse(snap));
+  lastCheck = { key: '', time: 0 };
+  syncControls();
+  renderCompositions();
+  schedule();
+}
+const undo = () => travel(history, future);
+const redo = () => travel(future, history);
+
+function syncHistory() {
+  $('undo').disabled = !history.length;
+  $('redo').disabled = !future.length;
+}
+
+function icon(name, cls = 'ic') {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', cls);
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', '#i-' + name);
+  svg.append(use);
+  return svg;
+}
+
+// The picture name shows only while its category is on screen.
+function showCompName(name) {
+  const item = catalog.compositions.find(c => c.id === draft.composition);
+  const visible = item && (!filter || item.kind === filter);
+  $('comp-name').textContent = name ?? (visible ? item.name : '');
+}
+
+function syncControls() {
+  const s = normalize(draft);
+  syncDirection();
+  syncHistory();
+  for (const b of $('mode').querySelectorAll('button')) b.classList.toggle('on', b.dataset.m === s.mode);
+  $('window-panel').hidden = s.mode !== 'window';
+  $('picture-panel').hidden = s.mode === 'window';
+  $('cover').classList.toggle('grab', s.mode === 'window');
+  $('window-nophoto').hidden = !!draft.photos.length;
+  $('win-n').value = s.win.n; $('win-n-out').textContent = `${s.win.n} × ${s.win.n}칸`;
+  $('title-length').value = s.length; $('length-out').textContent = `${s.length}칸`;
+  $('size-auto').classList.toggle('on', !s.size);
+  $('size-manual').classList.toggle('on', !!s.size);
+  $('size-slider').hidden = !s.size;
+  if (s.size) { $('title-size').value = s.size; $('size-out').textContent = `${s.size}px`; }
+  $('photo-count').textContent = draft.photos.length || '';
+}
+
 let renderTimer = 0, saveTimer = 0;
 function schedule() {
   prepared = null;
-  $('export').textContent = '이미지 준비';
+  $('export-label').textContent = 'Prepare images';
   clearTimeout(renderTimer);
   renderTimer = setTimeout(drawCover, 120);
 }
@@ -116,11 +197,21 @@ function schedule() {
 async function drawCover() {
   if (!draft) return;
   const canvas = $('cover');
-  const result = await render(canvas, draft);
+  const back = normalize(draft).mode === 'window' ? await behindPhoto() : null;
+  const result = await render(canvas, draft, { behind: back });
   $('title-warn').hidden = result.fits;
-  $('comp-name').textContent = result.item.name;
+  if (result.mode === 'picture') showCompName();
+  if (!draft.titleSize && result.titleSize) $('title-size').value = result.titleSize;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(persistDraft, 500);
+}
+
+async function behindPhoto() {
+  const p = draft.photos[0];
+  if (!p) return null;
+  const key = p.id + ':' + p.fit;
+  if (behind.key !== key) behind = { key, canvas: preparePhoto(await loadBlobImage(p.blob), p.fit) };
+  return behind.canvas;
 }
 
 async function persistDraft() {
@@ -141,8 +232,8 @@ async function persistDraft() {
 function syncDirection() {
   const text = draft.title.trim();
   const ko = language(text) === 'ko';
-  $('direction').hidden = !ko;
-  $('lang').textContent = !text ? '제목 없이 만들기' : ko ? '한국어 · 가로 또는 세로' : '영어 · 가로';
+  $('direction-field').hidden = !ko;
+  $('lang').textContent = !text ? '비워 두면 제목 타일 없이 만듭니다.' : ko ? '한국어 제목 · 가로 또는 세로' : '영어 제목 · 가로';
   for (const b of $('direction').querySelectorAll('button')) {
     b.classList.toggle('on', String(+!!draft.vertical) === b.dataset.v);
   }
@@ -160,6 +251,7 @@ function renderCompositions() {
     img.src = 'assets/' + c.thumb; img.alt = ''; img.loading = 'lazy';
     b.append(img);
     b.addEventListener('click', () => {
+      checkpoint('composition:' + c.id);
       draft.composition = c.id;
       grid.querySelectorAll('button').forEach(x => x.classList.remove('on'));
       b.classList.add('on');
@@ -168,6 +260,7 @@ function renderCompositions() {
     grid.append(b);
   }
   for (const b of $('filters').querySelectorAll('button')) b.classList.toggle('on', b.dataset.k === filter);
+  showCompName();
 }
 
 // ---------------------------------------------------------------- photos
@@ -187,31 +280,34 @@ async function addPhotos(files) {
     } catch (e) { toast(e.message); }
   }
   renderPhotos();
+  syncControls();
   schedule();
 }
 
 async function renderPhotos() {
   const list = $('photos');
   list.replaceChildren();
-  $('photo-count').textContent = draft.photos.length ? `${draft.photos.length}장` : '';
   for (const [i, p] of draft.photos.entries()) {
     const li = document.createElement('li');
     const num = document.createElement('span');
     num.className = 'num'; num.textContent = i + 2;
+    if (i === 0) num.title = '창 너머로 보이는 사진';
     const img = document.createElement('img');
     img.alt = '';
     const tools = document.createElement('div');
     tools.className = 'tools';
-    const button = (label, fn, disabled = false) => {
+    const button = (name, label, fn, disabled = false, cls = '') => {
       const b = document.createElement('button');
-      b.textContent = label; b.disabled = disabled;
+      b.append(icon(name)); b.disabled = disabled; b.className = cls;
+      b.setAttribute('aria-label', label); b.title = label;
       b.addEventListener('click', fn);
       tools.append(b);
     };
-    button(p.fit === 'crop' ? '자르기' : '여백', () => { p.fit = p.fit === 'crop' ? 'pad' : 'crop'; renderPhotos(); schedule(); });
-    button('↑', () => { move(i, -1); }, i === 0);
-    button('↓', () => { move(i, 1); }, i === draft.photos.length - 1);
-    button('✕', () => { draft.photos.splice(i, 1); renderPhotos(); schedule(); });
+    button(p.fit === 'crop' ? 'fill' : 'fit', p.fit === 'crop' ? 'Fill (tap for fit)' : 'Fit (tap for fill)',
+      () => { p.fit = p.fit === 'crop' ? 'pad' : 'crop'; renderPhotos(); schedule(); }, false, 'fit');
+    button('up', 'Move up', () => { move(i, -1); }, i === 0);
+    button('down', 'Move down', () => { move(i, 1); }, i === draft.photos.length - 1);
+    button('close', 'Remove', () => { draft.photos.splice(i, 1); renderPhotos(); syncControls(); schedule(); });
     li.append(num, img, tools);
     list.append(li);
     loadBlobImage(p.blob).then(source => {
@@ -259,7 +355,7 @@ async function exportImages() {
     await drawCover();
     prepared = await prepareFiles();
     button.disabled = false;
-    button.textContent = `사진 앱에 저장 (${prepared.length}장)`;
+    $('export-label').textContent = `Save ${prepared.length} to Photos`;
     status.textContent = '준비되었습니다. 버튼을 한 번 더 눌러 저장하세요.';
     return;
   }
@@ -306,6 +402,43 @@ async function finish(message) {
   showHome();
 }
 
+// ---------------------------------------------------------------- drag to pan the window photo
+
+function wireDrag() {
+  const canvas = $('cover');
+  let drag = null, frame = 0;
+  const point = e => {
+    const r = canvas.getBoundingClientRect();
+    return [(e.clientX - r.left) * 1080 / r.width, (e.clientY - r.top) * 1440 / r.height];
+  };
+  canvas.addEventListener('pointerdown', e => {
+    const f = windowFrame(draft);
+    if (!f) return;
+    const [x, y] = point(e);
+    if (x < f.x || x > f.x + f.size || y < f.y || y > f.y + f.size) return;
+    checkpoint('drag');
+    drag = { dx: x - f.x, dy: y - f.y, id: e.pointerId };
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic or ended pointer */ }
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const [x, y] = point(e);
+    const px = Math.round((x - drag.dx) / 90), py = Math.round((y - drag.dy) / 90);
+    const i = locate(draft, px, py);
+    if (i < 0 || i === draft.layout) return;
+    draft.layout = i;
+    if (!frame) frame = requestAnimationFrame(() => { frame = 0; drawCover(); });
+  });
+  const end = e => { if (drag && e.pointerId === drag.id) { drag = null; schedule(); } };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+}
+
+function showTab(name) {
+  for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === name);
+  for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== name;
+}
+
 // ---------------------------------------------------------------- wiring
 
 function wire() {
@@ -314,23 +447,89 @@ function wire() {
   $('title').addEventListener('input', e => { draft.title = e.target.value; syncDirection(); schedule(); });
   $('direction').addEventListener('click', e => {
     const v = e.target.closest('button')?.dataset.v;
-    if (v === undefined) return;
+    if (v === undefined || (v === '1') === !!draft.vertical) return;
+    checkpoint('direction');
     draft.vertical = v === '1'; draft.layout = 0;
     syncDirection(); schedule();
   });
+  $('undo').addEventListener('click', undo);
+  $('redo').addEventListener('click', redo);
+  $('mode').addEventListener('click', e => {
+    const m = e.target.closest('button')?.dataset.m;
+    if (!m || normalize(draft).mode === m) return;
+    checkpoint('mode');
+    draft.mode = m; draft.layout = 0;
+    syncControls(); schedule();
+  });
+  const winSlider = (id, key, scale) => $(id).addEventListener('input', e => {
+    checkpoint(id);
+    draft.window = Object.assign({}, normalize(draft).win, { [key]: +e.target.value / scale });
+    if (key === 'n') draft.layout = 0;
+    syncControls(); schedule();
+  });
+  winSlider('win-n', 'n', 1);
+  $('title-length').addEventListener('input', e => {
+    checkpoint('title-length');
+    draft.titleLength = +e.target.value; draft.layout = 0;
+    syncControls(); schedule();
+  });
+  $('title-size').addEventListener('input', e => {
+    checkpoint('title-size');
+    draft.titleSize = +e.target.value;
+    syncControls(); schedule();
+  });
+  $('size-auto').addEventListener('click', () => {
+    if (!draft.titleSize) return;
+    checkpoint('size-auto');
+    draft.titleSize = 0;
+    syncControls(); schedule();
+  });
+  $('size-manual').addEventListener('click', () => {
+    if (draft.titleSize) return;
+    checkpoint('size-manual');
+    draft.titleSize = +$('title-size').value || 30;
+    syncControls(); schedule();
+  });
+  for (const st of document.querySelectorAll('.stepper')) {
+    st.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const input = $(st.dataset.for);
+      const v = Math.min(+input.max, Math.max(+input.min, +input.value + +b.dataset.d));
+      if (v === +input.value) return;
+      input.value = v;
+      input.dispatchEvent(new Event('input'));
+    });
+  }
+  $('tabs').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) showTab(b.dataset.tab);
+  });
+  $('copy-caption-2').addEventListener('click', copyCaption);
+  for (const b of document.querySelectorAll('.dpad button')) {
+    b.addEventListener('click', () => {
+      const i = nudge(draft, +b.dataset.dx, +b.dataset.dy);
+      if (i < 0) { toast('그쪽으로는 더 옮길 수 없습니다'); return; }
+      checkpoint('nudge');
+      draft.layout = i; schedule();
+    });
+  }
+  wireDrag();
   $('filters').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
     filter = b.dataset.k;
     renderCompositions();
   });
-  $('shuffle-tiles').addEventListener('click', () => { draft.seed = seed(); schedule(); });
+  $('shuffle-tiles').addEventListener('click', () => { checkpoint('shuffle'); draft.seed = seed(); schedule(); });
   $('next-layout').addEventListener('click', () => {
-    const vertical = language(draft.title.trim()) === 'ko' && draft.vertical;
-    draft.layout = (draft.layout + 1) % layouts(vertical).length;
+    checkpoint('layout');
+    const s = normalize(draft);
+    draft.layout = ((draft.layout || 0) + 1) % layouts(s.vertical, s.block, s.length).length;
     schedule();
   });
   $('random-all').addEventListener('click', () => {
+    checkpoint('random');
     const comps = catalog.compositions.filter(c => !filter || c.kind === filter);
     draft.composition = comps[Math.floor(Math.random() * comps.length)].id;
     draft.seed = seed();
