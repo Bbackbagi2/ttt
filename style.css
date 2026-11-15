@@ -69,10 +69,6 @@ h1 { margin: 0; }
 h1 { font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .count { color: var(--faint); font-size: 13px; font-variant-numeric: tabular-nums; }
-.note { margin-top: 20px; color: var(--muted); font-size: 13px; }
-.note summary { cursor: pointer; color: var(--muted); }
-.note p { margin: 8px 0 0; line-height: 1.55; }
-.note strong { color: var(--ink); font-weight: 500; }
 
 /* ------------------------------------------------------------ editor: app layout */
 /* Sized from the measured visible area (see fitHeight in app.js), not from 100dvh: iOS home-screen
@@ -90,7 +86,8 @@ body.editing .editor { transform: none; }
 /* the home screen eases back underneath, like an iOS navigation stack */
 .home { transition: transform .38s cubic-bezier(.32, .72, 0, 1), opacity .38s; }
 body.editing { overflow: hidden; }
-body.editing .home { transform: translateX(-22%); opacity: .35; }
+body.editing .home, body.in-settings .home { transform: translateX(-22%); opacity: .35; }
+body.in-settings { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .editor, .home { transition: none; }
 }
@@ -333,3 +330,38 @@ body.typing .editor { padding-bottom: 0; }
 @keyframes panel-from-left { from { transform: translateX(-26px); opacity: 0; } }
 /* the hidden switch that plays the iOS haptic tick */
 .haptic { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+
+/* ------------------------------------------------------------ home header: title and settings */
+.home-title { flex: 1; min-width: 0; }
+.home-head .icon-btn { align-self: center; color: var(--muted); }
+
+/* ------------------------------------------------------------ settings page */
+.page {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--app-h, 100dvh);
+  max-width: 560px; margin: 0 auto; z-index: 12; background: var(--bg);
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  transform: translateX(100%); transition: transform .38s cubic-bezier(.32, .72, 0, 1);
+  box-shadow: -10px 0 32px rgba(0, 0, 0, .45);
+}
+body.in-settings #settings { transform: none; }
+.page-bar {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 4px) 8px 4px;
+}
+.page-bar h2 { margin: 0; text-align: center; font-size: 16px; font-weight: 600; }
+.page-body { overflow-y: auto; padding: 8px 16px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 24px); }
+.group-label { margin: 20px 4px 8px; font-size: 12.5px; color: var(--faint); }
+.group-label:first-child { margin-top: 8px; }
+.list { background: var(--raised); border-radius: var(--r); overflow: hidden; }
+.list-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
+  min-height: 50px; padding: 0 16px; border: 0; background: transparent; color: var(--ink); text-align: left;
+}
+.list-row + .list-row, .faq-item + .faq-item { border-top: 1px solid var(--line); }
+.list-row .chev { color: var(--faint); }
+.list-row input[type=checkbox] { width: 44px; height: 26px; margin: 0; accent-color: var(--primary); }
+.faq-item summary { list-style: none; padding: 15px 16px; cursor: pointer; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item p { margin: 0; padding: 0 16px 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.dev-info { margin: 10px 0 0; padding: 12px 14px; border-radius: var(--r); background: var(--raised);
+  font: 12px/1.55 ui-monospace, Menlo, monospace; color: var(--muted); white-space: pre-wrap; word-break: break-all; }

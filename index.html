@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <title>TTT</title>
 </head>
 <body>
@@ -38,6 +38,7 @@
   <symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 2-2 4 4"/></symbol>
   <symbol id="i-caption" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></symbol>
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.2"/></symbol>
   <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 12h6M9 16h4"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
@@ -60,10 +61,11 @@
 <main id="home" class="home">
   <header class="home-head">
     <img class="home-icon" src="icon-ce8623c-180.png" alt="">
-    <div>
+    <div class="home-title">
       <p class="eyebrow">The Thinker's Toilet</p>
       <h1>Posts</h1>
     </div>
+    <button id="open-settings" class="icon-btn" aria-label="Settings" title="Settings"><svg class="ic"><use href="#i-gear"/></svg></button>
   </header>
 
   <section class="home-section">
@@ -73,13 +75,36 @@
     </div>
     <ol id="slots" class="slots"></ol>
   </section>
-
-
-  <details class="note">
-    <summary>초안은 어디에 저장되나요?</summary>
-    <p>초안은 최대 3개까지 <strong>이 기기의 이 브라우저에만</strong> 저장됩니다. 서버나 iCloud로 보내지 않습니다. Safari가 오래 쓰지 않은 사이트의 데이터를 지울 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관할 수 있으니 한쪽만 쓰는 것을 권합니다. 사진 원본은 사진 앱에 그대로 있습니다.</p>
-  </details>
 </main>
+
+<!-- ============================================================ settings -->
+<section id="settings" class="page" hidden aria-label="Settings">
+  <header class="page-bar">
+    <button id="settings-back" class="icon-btn" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button>
+    <h2 id="settings-title">Settings</h2>
+    <span class="icon-btn" aria-hidden="true"></span>
+  </header>
+  <div class="page-body">
+    <div id="settings-main">
+      <p class="group-label">옵션</p>
+      <div class="list">
+        <label class="list-row"><span>햅틱</span><input id="opt-haptics" type="checkbox" switch></label>
+      </div>
+      <p class="group-label">도움말</p>
+      <div class="list">
+        <button id="open-help" class="list-row"><span>자주 묻는 질문</span><svg class="ic sm chev"><use href="#i-chev"/></svg></button>
+      </div>
+      <p class="group-label">개발자</p>
+      <div class="list">
+        <label class="list-row"><span>개발자 모드</span><input id="opt-dev" type="checkbox" switch></label>
+      </div>
+      <pre id="dev-info" class="dev-info" hidden></pre>
+    </div>
+    <div id="settings-help" hidden>
+      <div id="faq" class="list faq"></div>
+    </div>
+  </div>
+</section>
 
 <!-- ============================================================ editor -->
 <main id="editor" class="editor" hidden>
@@ -273,6 +298,6 @@
 
 <div id="toast" class="toast" hidden></div>
 <label id="haptic" class="haptic" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
-<script type="module" src="js/app.js?v=24"></script>
+<script type="module" src="js/app.js?v=25"></script>
 </body>
 </html>

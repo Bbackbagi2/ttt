@@ -128,16 +128,118 @@ function pickPicture(comps) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// ---------------------------------------------------------------- settings
+// Kept on this device only. New options go in DEFAULTS and get a row on the settings page.
+
+const SETTINGS_KEY = 'ttt-settings';
+const DEFAULTS = { haptics: true, dev: false };
+let settings = { ...DEFAULTS };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (_) { /* first run */ }
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (_) { toast('설정을 저장하지 못했습니다'); }
+}
+
+// Help: questions and answers, collected here as they come up.
+const FAQ = [
+  ['게시는 어떻게 하나요?',
+    'Export 탭에서 이미지를 사진 앱에 저장하고, 캡션을 복사해 인스타그램에 붙여넣습니다. 게시한 뒤 Mark as posted를 누르면 초안이 정리되고, 원하면 쓴 그림에 사용 표시가 붙습니다.'],
+  ['창(Window)은 무엇인가요?',
+    '표지 벽에 낸 김 서린 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 유리는 Tile과 Block 중에서 고릅니다.'],
+  ['초안은 어디에 저장되나요?',
+    '초안은 최대 3개까지 이 기기의 이 앱 안에만 저장되고, 서버나 iCloud로 보내지 않습니다. 홈 화면 앱을 지우면 초안도 함께 지워질 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관합니다. 사진 원본은 사진 앱에 그대로 있습니다.'],
+];
+
+function settingsView(view) {
+  $('settings-main').hidden = view !== 'main';
+  $('settings-help').hidden = view !== 'help';
+  $('settings-title').textContent = view === 'help' ? '자주 묻는 질문' : 'Settings';
+  $('settings').querySelector('.page-body').scrollTop = 0;
+}
+
+function renderSettings() {
+  $('opt-haptics').checked = settings.haptics;
+  $('opt-dev').checked = settings.dev;
+  $('dev-info').hidden = !settings.dev;
+  if (settings.dev) renderDevInfo();
+  $('faq').replaceChildren(...FAQ.map(([q, a]) => {
+    const d = document.createElement('details');
+    d.className = 'faq-item';
+    const sm = document.createElement('summary');
+    sm.textContent = q;
+    const p = document.createElement('p');
+    p.textContent = a;
+    d.append(sm, p);
+    return d;
+  }));
+}
+
+// Developer info: what this device reports, for checking the layout on a phone.
+function renderDevInfo() {
+  const standalone = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
+  const safe = safeAreas();
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '-';
+  const build = document.querySelector('script[src*="app.js"]')?.getAttribute('src').split('?v=')[1] || '-';
+  $('dev-info').textContent = [
+    `build v${build}`,
+    `standalone ${standalone}`,
+    `screen ${screen.width}×${screen.height} · dpr ${devicePixelRatio}`,
+    `inner ${innerWidth}×${innerHeight}`,
+    `safe top ${safe.top} · bottom ${safe.bottom}`,
+    `app ${css('--app-h')} · stage ${css('--stage-h')} · tab ${css('--tab-h')}`,
+    `status bar ${document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').content}`,
+    navigator.userAgent.replace(/^Mozilla\/5\.0 /, ''),
+  ].join('\n');
+}
+
+function openSettings() {
+  renderSettings();
+  settingsView('main');
+  const page = $('settings');
+  page.hidden = false;
+  page.getBoundingClientRect();
+  document.body.classList.add('in-settings');
+  $('home').inert = true;
+  window.history.pushState({ settings: 'main' }, '');
+}
+
+function closeSettings() {
+  if (!document.body.classList.contains('in-settings')) return;
+  document.body.classList.remove('in-settings');
+  $('home').inert = false;
+  setTimeout(() => { if (!document.body.classList.contains('in-settings')) $('settings').hidden = true; }, 420);
+}
+
+function wireSettings() {
+  $('open-settings').addEventListener('click', openSettings);
+  $('settings-back').addEventListener('click', () => {
+    if (window.history.state?.settings) window.history.back();
+    else closeSettings();
+  });
+  $('open-help').addEventListener('click', () => {
+    settingsView('help');
+    window.history.pushState({ settings: 'help' }, '');
+  });
+  $('opt-haptics').addEventListener('change', e => { settings.haptics = e.target.checked; saveSettings(); });
+  $('opt-dev').addEventListener('change', e => {
+    settings.dev = e.target.checked;
+    saveSettings();
+    $('dev-info').hidden = !settings.dev;
+    if (settings.dev) renderDevInfo();
+  });
+}
+
 // ---------------------------------------------------------------- home
 
-// Home: the three draft slots as cover cards; empty ones start a new post.
+// Home: the drafts as cover cards, and one New post card after them while there is room.
 async function renderHome() {
   const drafts = await store.list();
   $('draft-count').textContent = `${drafts.length} / ${store.LIMIT}`;
   const list = $('slots');
   releaseUrls(homeUrls);
   list.replaceChildren();
-  for (let i = 0; i < store.LIMIT; i++) {
+  // The drafts, then one New post card after the last while there is room.
+  const cards = drafts.length < store.LIMIT ? drafts.length + 1 : drafts.length;
+  for (let i = 0; i < cards; i++) {
     const d = drafts[i];
     const li = document.createElement('li');
     li.className = 'slot' + (d ? '' : ' free');
@@ -262,6 +364,8 @@ function wireNavigation() {
     const st = window.history.state || {};
     if (!st.sheet && !$('sheet').hidden) $('sheet').hidden = true;
     if (!st.editor && editing()) closeEditor();
+    if (!st.settings) closeSettings();
+    else if (st.settings === 'main' && !$('settings-help').hidden) settingsView('main');
   });
   // Swipe right from the left edge to go back, following the finger.
   const ed = $('editor');
@@ -921,6 +1025,7 @@ function springPill(i, instant = false) {
 // iOS gives Safari no vibration API, but toggling a native switch control plays the system
 // haptic tick (iOS 18 and later). A hidden one is clicked on each snap.
 function tick() {
+  if (!settings.haptics) return;
   try { $('haptic').click(); } catch (_) { /* no haptics here */ }
 }
 
@@ -1178,6 +1283,7 @@ function wire() {
 
   wire();
   wireNavigation();
+  wireSettings();
   ready = init();
   ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   store.persist();
