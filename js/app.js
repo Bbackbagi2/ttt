@@ -53,15 +53,19 @@ function fitHeight() {
   root.setProperty('--app-top', top + 'px');
   root.setProperty('--app-h', h + 'px');
   root.setProperty('--stage-h', stage + 'px');
-  // When a home-screen app's page stops short of the screen bottom, the home indicator is not over
-  // the page, so its safe-area inset would only lift the tab bar off the bottom.
+  // iOS 26.1+ home-screen apps that draw under the status bar get a page as tall as the screen
+  // minus the status bar, yet pinned to the top, so it stops that much short of the bottom (on an
+  // iPhone 16 Pro: 874 - 62 = 812). The home indicator is then below the page, and its inset would
+  // only lift the tab bar. Measured on device 2026-11-15: inner 812, safe top 62, bottom 34.
+  const safe = safeAreas();
   const shortfall = (portrait ? long : short) - (top + h);
-  if (standalone && shortfall > 40) root.setProperty('--safe-bottom', '0px');
+  const clipped = standalone && safe.top > 0 && shortfall > 40 && Math.abs(shortfall - safe.top) < 10;
+  if (clipped) root.setProperty('--safe-bottom', '0px');
   else root.removeProperty('--safe-bottom');
   document.documentElement.dataset.screen = reference ? 'reference' : 'scaled';
   fitHeight.last = { standalone, screen: `${screen.width}×${screen.height}`, inner: `${innerWidth}×${innerHeight}`,
     visual: vv ? `${Math.round(vv.width)}×${h} @${top}` : '-', client: document.documentElement.clientHeight,
-    safe: safeAreas(), shortfall, dpr: devicePixelRatio, stage };
+    safe, shortfall, clipped, dpr: devicePixelRatio, stage };
 }
 
 // The fixed top bar and tab bar keep their room in the editor as their sizes change.
@@ -82,7 +86,8 @@ function showScreenInfo() {
   $('screen-info').textContent = [
     `standalone ${i.standalone}`, `screen ${i.screen} · dpr ${i.dpr}`, `inner ${i.inner}`,
     `visual ${i.visual}`, `client height ${i.client}`, `safe top ${i.safe.top} · bottom ${i.safe.bottom}`,
-    `shortfall ${i.shortfall}`, `stage ${i.stage}`, `tab bar ${Math.round(bar.height)} high`,
+    `shortfall ${i.shortfall} · clipped ${i.clipped}`, `stage ${i.stage}`,
+    `status bar ${document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').content}`,
     navigator.userAgent.replace(/^Mozilla\/5\.0 /, ''),
   ].join('\n');
 }
