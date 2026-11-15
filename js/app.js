@@ -139,6 +139,13 @@ function pickPicture(comps) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// ---------------------------------------------------------------- back navigation
+// In Safari, screens add history entries so the browser's back works. The home-screen app has
+// no back button, only iOS's edge swipe, which a sideways drag near the screen edge could set off
+// by accident; there the app adds no entries and keeps its own back buttons and edge swipe.
+const standaloneApp = () => !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
+function pushNav(state) { if (!standaloneApp()) window.history.pushState(state, ''); }
+
 // ---------------------------------------------------------------- settings
 // Kept on this device only. New options go in DEFAULTS and get a row on the settings page.
 
@@ -185,7 +192,20 @@ function maybeTour(name) {
   if (!steps.length) return;
   let i = 0;
   const ring = $('coach').querySelector('.coach-ring'), bubble = $('coach').querySelector('.coach-bubble');
+  // The ring follows its target every frame, so a screen still sliding into place (home coming
+  // back from Settings, say) does not leave it where the target was a moment ago.
+  const follow = () => {
+    if ($('coach').hidden) return;
+    position();
+    requestAnimationFrame(follow);
+  };
   const place = () => {
+    $('coach-text').textContent = steps[i].text;
+    $('coach-step').textContent = `${i + 1} / ${steps.length}`;
+    $('coach-next').textContent = i === steps.length - 1 ? 'Done' : 'Next';
+    position();
+  };
+  const position = () => {
     const r = steps[i].el.getBoundingClientRect(), pad = 6;
     const W = window.innerWidth, H = window.innerHeight;
     const top = Math.max(0, r.top - pad), left = Math.max(0, r.left - pad);
@@ -197,9 +217,6 @@ function maybeTour(name) {
       left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px`,
       borderRadius: `14px 14px ${round('right', right >= W - 1)} ${round('left', left <= 1)}`,
     });
-    $('coach-text').textContent = steps[i].text;
-    $('coach-step').textContent = `${i + 1} / ${steps.length}`;
-    $('coach-next').textContent = i === steps.length - 1 ? 'Done' : 'Next';
     const below = r.bottom + 16 + 150 < window.innerHeight;
     bubble.style.top = below ? `${r.bottom + 16}px` : '';
     bubble.style.bottom = below ? '' : `${window.innerHeight - r.top + 16}px`;
@@ -213,6 +230,7 @@ function maybeTour(name) {
   $('coach-skip').onclick = finish;
   $('coach').hidden = false;
   place();
+  requestAnimationFrame(follow);
 }
 
 function saveSettings() {
@@ -354,7 +372,7 @@ function openSettings() {
   page.getBoundingClientRect();
   document.body.classList.add('in-settings');
   $('home').inert = true;
-  window.history.pushState({ settings: 'main' }, '');
+  pushNav({ settings: 'main' });
 }
 
 function closeSettings() {
@@ -370,11 +388,12 @@ function wireSettings() {
   $('open-settings').addEventListener('click', openSettings);
   $('settings-back').addEventListener('click', () => {
     if (window.history.state?.settings) window.history.back();
+    else if ($('settings-main').hidden) settingsView('main');
     else closeSettings();
   });
   $('open-trash').addEventListener('click', () => {
     settingsView('trash');
-    window.history.pushState({ settings: 'trash' }, '');
+    pushNav({ settings: 'trash' });
   });
   $('empty-trash').addEventListener('click', async () => {
     const n = (await store.listTrash()).length;
@@ -383,7 +402,7 @@ function wireSettings() {
   });
   $('open-help').addEventListener('click', () => {
     settingsView('help');
-    window.history.pushState({ settings: 'help' }, '');
+    pushNav({ settings: 'help' });
   });
   $('opt-haptics').addEventListener('change', e => { settings.haptics = e.target.checked; saveSettings(); });
   $('opt-beginner').addEventListener('change', e => {
@@ -534,7 +553,7 @@ function enterEditor() {
   springPill(tabIndex(currentTab), true);
   document.body.classList.add('editing');
   $('home').inert = true;
-  if (!window.history.state?.editor) window.history.pushState({ editor: true }, '');
+  if (!window.history.state?.editor) pushNav({ editor: true });
   setTimeout(() => { if (editing()) maybeTour('editor'); }, 450);
 }
 
@@ -572,7 +591,9 @@ function wireNavigation() {
   let s = null;
   ed.addEventListener('touchstart', e => {
     const t = e.touches[0];
-    s = e.touches.length === 1 && t.clientX < 24 && $('sheet').hidden ? { x: t.clientX, y: t.clientY, dx: 0, on: false } : null;
+    // Not from the tab bar: a drag across the tabs that starts near the edge is not a back swipe.
+    const fromTabs = e.target.closest?.('#tabs');
+    s = e.touches.length === 1 && t.clientX < 24 && $('sheet').hidden && !fromTabs ? { x: t.clientX, y: t.clientY, dx: 0, on: false } : null;
   }, { passive: true });
   ed.addEventListener('touchmove', e => {
     if (!s) return;
@@ -978,7 +999,7 @@ async function openPreview() {
     grid.append(cell);
   }
   $('sheet').hidden = false;
-  if (!window.history.state?.sheet) window.history.pushState({ editor: true, sheet: true }, '');
+  if (!window.history.state?.sheet) pushNav({ editor: true, sheet: true });
   feedSlide = 0;
   box.scrollLeft = 0;
   showPreviewMode('feed');
