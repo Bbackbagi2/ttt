@@ -6,8 +6,6 @@ const COLS = 12, ROWS = 16;
 const FONT = 'TTTTitle';
 const GLASS = [214, 228, 230];   // pale blue-green tint of the window glass
 const FROST = .35;                // fixed semi-transparent glass
-const EDGE = [150, 186, 180];     // the greener colour of thick glass seen edge-on
-const bevelWidth = S => Math.round(clamp(S * .045, 9, 20));
 
 let catalog = null;
 let atlas = null;           // ImageData of tiles.png
@@ -42,6 +40,8 @@ export async function init() {
     font.load().then(f => document.fonts.add(f)),
     loadImage('assets/window/fog.png').then(img => { steam.fog = pixels(img); }),
     loadImage('assets/window/drops.png').then(img => { steam.drops = pixels(img); }),
+    loadImage('assets/window/tile.png').then(img => { steam.tile = pixels(img); }),
+    loadImage('assets/window/tile-body.png').then(img => { steam.body = pixels(img); }),
   ];
   for (let n = 1; n <= MAXLEN; n++) {
     jobs.push(loadImage(`assets/plaque/square-${n}.png`).then(img => { frames[`square-${n}`] = pixels(img); }));
@@ -249,9 +249,20 @@ function plaque(fit, colors, orient, w, h, rand) {
 // One glass pane of n x n small-tile units. It is a hole in the wall: behind it is the
 // next slide (the first body photo, already fitted to 1080x1440) at the very same place,
 // so swiping from the cover to the photo continues the view.
+// The window is one large glass tile. Two kinds of real-image layers make it:
+//  - tile.png / tile-body.png: a photographed wall tile, enlarged to the window. Its edges and
+//    surface give the tile its real relief: R, G bend the view behind (128 = none), B is the
+//    light and shade of the surface, and tile-body is its milky brightness.
+//  - fog.png / drops.png: condensation on the glass (mist, drops and drip trails).
+// Behind the glass is the next slide (the first body photo) at the same place, so swiping from
+// the cover to the photo continues the view.
+export function setGlass(layer, body) {
+  steam.tile = layer;
+  steam.body = body;
+}
+
 function windowPane(behind, x0, y0, n, frost, rand) {
-  const S = n * P, pad = 16, B = S + 2 * pad;
-  // The view behind, with a margin so the drops can bend in light from just outside.
+  const S = n * P, pad = 24, B = S + 2 * pad;
   const src = document.createElement('canvas');
   src.width = src.height = B;
   const sg = src.getContext('2d', { willReadFrequently: true });
@@ -268,18 +279,6 @@ function windowPane(behind, x0, y0, n, frost, rand) {
   mg.drawImage(src, 0, 0, small.width, small.height);
   sg.drawImage(small, 0, 0, B, B);
   const soft = sg.getImageData(0, 0, B, B).data;
-
-  // A window-sized piece of the steamed-up glass layers, at a seeded place.
-  const T = steam.fog.width;
-  const ox = Math.floor(rand() * Math.max(1, T - S)), oy = Math.floor(rand() * Math.max(1, T - S));
-  const fog = steam.fog.data, drops = steam.drops.data;
-  const thick = clamp(frost / FROST, 0, 1.6);
-
-  const pane = document.createElement('canvas');
-  pane.width = pane.height = S;
-  const g = pane.getContext('2d', { willReadFrequently: true });
-  const out = g.createImageData(S, S);
-  const o = out.data;
   const sample = (data, x, y, ch) => {
     x = clamp(x, 0, B - 1.001); y = clamp(y, 0, B - 1.001);
     const ix = x | 0, iy = y | 0, fx = x - ix, fy = y - iy;
@@ -287,21 +286,30 @@ function windowPane(behind, x0, y0, n, frost, rand) {
     const top = data[a] + (data[b] - data[a]) * fx;
     return top + (data[c] + (data[d] - data[c]) * fx - top) * fy;
   };
-  // The pane is one thick glass tile with rounded edges, raised from the wall like the
-  // small tiles. Near its edges the thick glass bends the view inward.
-  const BW = bevelWidth(S);
+
+  // The photographed tile is stretched over the whole window; the condensation is cropped.
+  const tile = steam.tile, NT = tile ? tile.width : 1, kt = NT / S;
+  const td = tile?.data, milk = steam.body?.data;
+  const T = steam.fog.width;
+  const ox = Math.floor(rand() * Math.max(1, T - S)), oy = Math.floor(rand() * Math.max(1, T - S));
+  const fog = steam.fog.data, drops = steam.drops.data;
+  const thick = clamp(frost / FROST, 0, 1.6);
+  const BEND = 11, MILK = .34;
+
+  const out = new ImageData(S, S), o = out.data;
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const k = (y * S + x) * 4;
+      let bx = 0, by = 0, shade = 0, body = .5;
+      if (td) {
+        const ti = (Math.min(NT - 1, (y * kt) | 0) * NT + Math.min(NT - 1, (x * kt) | 0)) * 4;
+        bx = (td[ti] - 128) / 127 * BEND;
+        by = (td[ti + 1] - 128) / 127 * BEND;
+        shade = (td[ti + 2] - 128) / 127;
+        if (milk) body = milk[ti] / 255;
+      }
       const t = ((oy + y) % T * T + (ox + x) % T) * 4;
       const cap = drops[t + 2] / 255;
-      const ex = Math.min(x, S - 1 - x), ey = Math.min(y, S - 1 - y);
-      const bev = Math.max(0, 1 - Math.min(ex, ey) / BW);
-      let bx = 0, by = 0;
-      if (bev > 0) {
-        const push = bev * bev * BW * .9;
-        if (ex <= ey) bx = x < S / 2 ? push : -push; else by = y < S / 2 ? push : -push;
-      }
       if (cap > 0) {
         // A drop is a small lens: it shows the view flipped and a little sharper,
         // darkens toward its rim and carries a highlight from the upper-left light.
@@ -313,13 +321,12 @@ function windowPane(behind, x0, y0, n, frost, rand) {
         const d = Math.hypot(nx + .36, ny + .46);
         const spec = cap > .25 ? Math.max(0, 1 - d / .24) ** 2 : 0;
         for (let ch = 0; ch < 3; ch++) {
-          const v = sample(sharp, sx, sy, ch) * rim + 12 + 95 * lit * lit * (1 - cap) + 235 * spec;
-          o[k + ch] = v;
+          o[k + ch] = sample(sharp, sx, sy, ch) * rim + 12 + 95 * lit * lit * (1 - cap) + 235 * spec;
         }
       } else {
         // Mist: the view goes soft and pale where it is thick.
         const f = clamp(fog[t + 3] / 255 * thick, 0, 1);
-        const blur = Math.min(1, f * 1.5), white = f * .62;
+        const blur = Math.min(1, f * 1.5), white = f * .55;
         const sx = x + pad + bx, sy = y + pad + by;
         for (let ch = 0; ch < 3; ch++) {
           const a = sample(sharp, sx, sy, ch);
@@ -327,71 +334,17 @@ function windowPane(behind, x0, y0, n, frost, rand) {
           o[k + ch] = v + (fog[t + ch] - v) * white;
         }
       }
+      // The tile's own glass: its milky body, then the light and shade of its relief on top.
+      for (let ch = 0; ch < 3; ch++) {
+        let v = o[k + ch];
+        v += (GLASS[ch] * (.8 + .32 * body) - v) * MILK;
+        v = shade > 0 ? v + (255 - v) * shade * .55 : v * (1 + shade * .45);
+        o[k + ch] = v;
+      }
       o[k + 3] = 255;
     }
   }
-  g.putImageData(out, 0, 0);
-
-  // Glass tint, thicker-looking toward the edges.
-  const tint = g.createRadialGradient(S * .45, S * .4, S * .1, S / 2, S / 2, S * .75);
-  tint.addColorStop(0, `rgba(${GLASS.join(',')},.04)`);
-  tint.addColorStop(1, `rgba(${GLASS.join(',')},.14)`);
-  g.fillStyle = tint;
-  g.fillRect(0, 0, S, S);
-
-  // A faint glaze surface from the tile photographs, so the pane belongs to the wall.
-  const list = glazes.square;
-  g.globalAlpha = .06;
-  g.drawImage(list[Math.floor(rand() * list.length)], 0, 0, S, S);
-  g.globalAlpha = 1;
-
-  // Reflections of the room light, which comes from the upper left like the wall light:
-  // a soft sheen in that corner and two diagonal streaks.
-  g.save();
-  g.globalCompositeOperation = 'screen';
-  const sheen = g.createLinearGradient(0, 0, S, S);
-  sheen.addColorStop(0, 'rgba(255,255,255,.12)');
-  sheen.addColorStop(.45, 'rgba(255,255,255,0)');
-  sheen.addColorStop(1, 'rgba(255,255,255,.05)');
-  g.fillStyle = sheen;
-  g.fillRect(0, 0, S, S);
-  const shift = (rand() - .5) * .08;
-  const streak = g.createLinearGradient(0, 0, S, S);
-  const stops = [[0, 0], [.2, 0], [.25, .14], [.3, .02], [.34, .08], [.37, 0], [.68, 0], [.71, .05], [.74, 0], [1, 0]];
-  for (const [t, a] of stops) streak.addColorStop(clamp(t + (t > 0 && t < 1 ? shift : 0), 0, 1), `rgba(255,255,255,${a})`);
-  g.fillStyle = streak;
-  g.fillRect(0, 0, S, S);
-  g.restore();
-
-  // Raised edge, lit like the wall tiles from the upper left: the top and left bevels catch
-  // the light, the bottom and right bevels turn away from it, and the thick edge looks greener.
-  const img = g.getImageData(0, 0, S, S), q = img.data;
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const ex = Math.min(x, S - 1 - x), ey = Math.min(y, S - 1 - y);
-      const e = Math.min(ex, ey);
-      if (e >= BW) continue;
-      const bev = 1 - e / BW;
-      const side = ex <= ey ? (x < S / 2 ? .75 : -.6) : (y < S / 2 ? 1 : -.8);
-      const amount = bev ** 1.4 * side;
-      const k = (y * S + x) * 4;
-      for (let ch = 0; ch < 3; ch++) {
-        let v = q[k + ch];
-        v += (EDGE[ch] - v) * bev * .28;
-        v += amount > 0 ? (255 - v) * amount * .62 : v * amount * .42;
-        q[k + ch] = v;
-      }
-    }
-  }
-  // A thin bright line where the flat face turns into the bevel, as on glazed tiles.
-  for (let i = 0; i < S; i++) {
-    for (const [x, y, a] of [[i, BW, .22], [BW, i, .16]]) {
-      if (x < BW || y < BW || x >= S - BW || y >= S - BW) continue;
-      const k = (y * S + x) * 4;
-      for (let ch = 0; ch < 3; ch++) q[k + ch] += (255 - q[k + ch]) * a;
-    }
-  }
-  return img;
+  return out;
 }
 
 // Layout index that puts the block at (px, py), keeping the title on the same side if possible.
