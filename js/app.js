@@ -1216,10 +1216,23 @@ function springPill(i, instant = false) {
 }
 
 // iOS gives Safari no vibration API, but toggling a native switch control plays the system
-// haptic tick (iOS 18 and later). A hidden one is clicked on each snap.
+// haptic tick (iOS 18 and later). A fresh, undisplayed switch is clicked for each tick. iOS only
+// plays it inside a user action (a tap or the lift of a finger), not while a finger is moving, so
+// a drag across the tab bar ticks once when it lets go.
 function tick() {
   if (!settings.haptics) return;
-  try { $('haptic').click(); } catch (_) { /* no haptics here */ }
+  try {
+    const label = document.createElement('label');
+    label.setAttribute('aria-hidden', 'true');
+    label.style.display = 'none';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    label.append(input);
+    document.head.append(label);
+    label.click();
+    label.remove();
+  } catch (_) { /* no haptics here */ }
 }
 
 function wireTabSlider() {
@@ -1248,15 +1261,20 @@ function wireTabSlider() {
     paintPill();
     if (near.i !== drag.i) {
       drag.i = near.i;
-      tick();
+      drag.moved = true;
+      tick();                     // plays where the browser allows it mid-gesture; iOS waits for the lift
       showTab(tabButtons()[near.i].dataset.tab, { glide: false });
     }
   });
   const end = e => {
     if (!drag || e.pointerId !== drag.id) return;
-    const was = drag.on;
+    const was = drag.on, moved = drag.moved;
     drag = null;
-    if (was) { pill.v = 0; springPill(tabIndex(currentTab)); }
+    if (was) {
+      pill.v = 0;
+      springPill(tabIndex(currentTab));
+      if (moved) tick();          // the lift is a user action, so iOS plays this one
+    }
   };
   bar.addEventListener('pointerup', end);
   bar.addEventListener('pointercancel', end);

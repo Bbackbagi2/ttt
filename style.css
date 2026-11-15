@@ -328,8 +328,6 @@ body.typing .editor { padding-bottom: 0; }
 .panel.from-left { animation: panel-from-left .34s cubic-bezier(.22, 1, .36, 1); }
 @keyframes panel-from-right { from { transform: translateX(26px); opacity: 0; } }
 @keyframes panel-from-left { from { transform: translateX(-26px); opacity: 0; } }
-/* the hidden switch that plays the iOS haptic tick */
-.haptic { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 
 /* ------------------------------------------------------------ home header: title and settings */
 .home-title { flex: 1; min-width: 0; }
