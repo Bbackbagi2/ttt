@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 <title>TTT</title>
 </head>
 <body>
@@ -74,6 +74,7 @@
       <span id="draft-count" class="count"></span>
     </div>
     <ol id="slots" class="slots"></ol>
+    <p class="hint guide home-guide">New post로 새 게시물을 시작합니다. 초안 카드를 길게 누르면 열기·휴지통 메뉴가 나옵니다. 오른쪽 위 톱니바퀴에서 초보자 모드를 끌 수 있습니다.</p>
   </section>
 </main>
 
@@ -88,6 +89,7 @@
     <div id="settings-main">
       <p class="group-label">옵션</p>
       <div class="list">
+        <label class="list-row"><span>초보자 모드</span><input id="opt-beginner" type="checkbox" switch></label>
         <label class="list-row"><span>햅틱</span><input id="opt-haptics" type="checkbox" switch></label>
       </div>
       <p class="group-label">보관</p>
@@ -148,6 +150,7 @@
   <div class="panels">
     <!-- cover -->
     <section data-panel="cover" class="panel">
+      <p class="hint guide">표지를 만듭니다. Picture는 그림 타일, Window는 김 서린 유리창입니다. 화살표로 위치를 옮기고, Layout·Tiles·Random으로 배치와 타일을 바꿉니다. 아래 메뉴는 누르거나 가로로 문질러 넘깁니다.</p>
       <div id="mode" class="segmented">
         <button data-m="picture" class="on"><svg class="ic sm"><use href="#i-picture"/></svg>Picture</button>
         <button data-m="window"><svg class="ic sm"><use href="#i-window"/></svg>Window</button>
@@ -195,7 +198,7 @@
             <button data-g="tile" class="on">Tile</button><button data-g="block">Block</button>
           </div>
         </div>
-        <p class="hint">창은 김 서린 큰 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
+        <p class="hint guide">창은 김 서린 큰 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
         <p id="window-nophoto" class="warn" hidden>본문 사진이 아직 없습니다. Photos 탭에서 추가하면 첫 장이 창 너머로 보입니다.</p>
       </div>
     </section>
@@ -206,7 +209,7 @@
         <input id="title" class="text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="제목을 적어 주세요">
         <button id="paste-title" class="icon-btn field-btn" aria-label="Paste" title="Paste"><svg class="ic"><use href="#i-paste"/></svg></button>
       </div>
-      <p id="lang" class="hint"></p>
+      <p id="lang" class="hint guide"></p>
       <p id="title-warn" class="warn" hidden>제목이 타일에 들어가지 않습니다. 제목을 줄이거나, 타일을 늘리거나, 글자를 줄여 주세요.</p>
       <div class="group">
         <div class="row" id="direction-field">
@@ -233,7 +236,7 @@
     <!-- photos -->
     <section data-panel="photos" class="panel" hidden>
       <label class="btn wide"><svg class="ic"><use href="#i-add"/></svg>Add photos<input id="photo-input" type="file" accept="image/*" multiple hidden></label>
-      <p class="hint">표지 다음 장에 순서대로 들어갑니다. 테마 없이 3:4로 맞추며, 사진은 이 기기 안에서만 처리합니다.</p>
+      <p class="hint guide">표지 다음 장에 순서대로 들어갑니다. 테마 없이 3:4로 맞추며, 사진은 이 기기 안에서만 처리합니다.</p>
       <ol id="photos" class="photos"></ol>
     </section>
 
@@ -242,7 +245,7 @@
       <div id="caption-mode" class="segmented">
         <button data-c="single" class="on">Single caption</button><button data-c="multiple">Multiple captions</button>
       </div>
-      <p id="caption-hint" class="hint"></p>
+      <p id="caption-hint" class="hint guide"></p>
       <textarea id="caption" rows="6" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
       <div class="row">
         <span id="caption-count" class="hint">0 / 2,200</span>
@@ -255,6 +258,7 @@
 
     <!-- export -->
     <section data-panel="export" class="panel" hidden>
+      <p class="hint guide">① Prepare images를 누른 뒤 Save to Photos로 사진 앱에 저장합니다. ② 캡션을 복사합니다. ③ 인스타그램에서 사진을 순서대로 골라 게시합니다. ④ 게시가 끝나면 Mark as posted를 누릅니다.</p>
       <div class="group">
         <button id="export" class="btn primary wide"><svg class="ic"><use href="#i-export"/></svg><span id="export-label">Prepare images</span></button>
         <p id="export-status" class="hint"></p>
@@ -302,7 +306,20 @@
       <button id="feed-more" class="feed-more" hidden>더 보기</button>
     </article>
     <div id="grid" class="profile-grid" hidden></div>
-    <p id="preview-note" class="hint sheet-note"></p>
+    <p id="preview-note" class="hint sheet-note guide"></p>
+  </div>
+</div>
+
+<!-- step-by-step guide (beginner mode) -->
+<div id="coach" class="coach" hidden>
+  <div class="coach-ring"></div>
+  <div class="coach-bubble" role="dialog" aria-live="polite">
+    <span id="coach-step" class="coach-step"></span>
+    <p id="coach-text"></p>
+    <div class="coach-actions">
+      <button id="coach-skip" class="btn quiet">Skip</button>
+      <button id="coach-next" class="btn primary">Next</button>
+    </div>
   </div>
 </div>
 
@@ -319,6 +336,6 @@
   </div>
 </div>
 <label id="haptic" class="haptic" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
-<script type="module" src="js/app.js?v=26"></script>
+<script type="module" src="js/app.js?v=27"></script>
 </body>
 </html>

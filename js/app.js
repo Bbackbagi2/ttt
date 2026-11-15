@@ -143,9 +143,61 @@ function pickPicture(comps) {
 // Kept on this device only. New options go in DEFAULTS and get a row on the settings page.
 
 const SETTINGS_KEY = 'ttt-settings';
-const DEFAULTS = { haptics: true, dev: false };
+const DEFAULTS = { haptics: true, dev: false, beginner: false, toured: {} };
 let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (_) { /* first run */ }
+// Beginner mode shows the on-screen help (elements marked .guide) and a guide tour per screen.
+function applyBeginner() { document.body.classList.toggle('beginner', !!settings.beginner); }
+
+// ---------------------------------------------------------------- guide tour (beginner mode)
+// A spotlight ring moves from one control to the next with a short note under or above it.
+
+const TOURS = {
+  home: [
+    ['#slots .slot:last-child .card', '여기서 새 게시물을 시작합니다. 초안은 이 기기에만 5개까지 보관됩니다.'],
+    ['#slots', '초안 카드를 누르면 이어서 편집하고, 길게 누르면 열기·휴지통 메뉴가 나옵니다.'],
+    ['#open-settings', '설정입니다. 초보자 모드, 휴지통, 자주 묻는 질문이 여기 있습니다.'],
+  ],
+  editor: [
+    ['#cover', '표지 미리보기입니다. 창(Window)을 고르면 미리보기에서 창을 끌어 옮길 수 있습니다.'],
+    ['#mode', 'Picture는 그림 타일, Window는 다음 장 사진이 비쳐 보이는 김 서린 유리창입니다.'],
+    ['#tabs', '제목·사진·캡션·내보내기로 넘어가는 메뉴입니다. 누르거나 가로로 문질러 넘깁니다.'],
+    ['#open-preview', '인스타그램에 올렸을 때의 모습을 미리 봅니다.'],
+    ['.bar .history', '바꾼 표지 설정을 되돌리거나 다시 실행합니다.'],
+  ],
+};
+
+function maybeTour(name) {
+  if (!settings.beginner || settings.toured?.[name] || !$('coach').hidden) return;
+  const steps = TOURS[name]
+    .map(([sel, text]) => ({ el: document.querySelector(sel), text }))
+    .filter(st => st.el && st.el.getClientRects().length);
+  if (!steps.length) return;
+  let i = 0;
+  const ring = $('coach').querySelector('.coach-ring'), bubble = $('coach').querySelector('.coach-bubble');
+  const place = () => {
+    const r = steps[i].el.getBoundingClientRect(), pad = 6;
+    const top = Math.max(2, r.top - pad), left = Math.max(2, r.left - pad);
+    const right = Math.min(window.innerWidth - 2, r.right + pad), bottom = Math.min(window.innerHeight - 2, r.bottom + pad);
+    Object.assign(ring.style, { left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px` });
+    $('coach-text').textContent = steps[i].text;
+    $('coach-step').textContent = `${i + 1} / ${steps.length}`;
+    $('coach-next').textContent = i === steps.length - 1 ? 'Done' : 'Next';
+    const below = r.bottom + 16 + 150 < window.innerHeight;
+    bubble.style.top = below ? `${r.bottom + 16}px` : '';
+    bubble.style.bottom = below ? '' : `${window.innerHeight - r.top + 16}px`;
+  };
+  const finish = () => {
+    $('coach').hidden = true;
+    settings.toured = { ...settings.toured, [name]: true };
+    saveSettings();
+  };
+  $('coach-next').onclick = () => { tick(); if (++i < steps.length) place(); else finish(); };
+  $('coach-skip').onclick = finish;
+  $('coach').hidden = false;
+  place();
+}
+
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (_) { toast('설정을 저장하지 못했습니다'); }
 }
@@ -211,6 +263,7 @@ async function renderTrash() {
 
 function renderSettings() {
   $('opt-haptics').checked = settings.haptics;
+  $('opt-beginner').checked = settings.beginner;
   $('opt-dev').checked = settings.dev;
   $('dev-info').hidden = !settings.dev;
   liveDevInfo(settings.dev);
@@ -290,6 +343,7 @@ function openSettings() {
 function closeSettings() {
   if (!document.body.classList.contains('in-settings')) return;
   liveDevInfo(false);
+  setTimeout(() => maybeTour('home'), 450);
   document.body.classList.remove('in-settings');
   $('home').inert = false;
   setTimeout(() => { if (!document.body.classList.contains('in-settings')) $('settings').hidden = true; }, 420);
@@ -315,6 +369,13 @@ function wireSettings() {
     window.history.pushState({ settings: 'help' }, '');
   });
   $('opt-haptics').addEventListener('change', e => { settings.haptics = e.target.checked; saveSettings(); });
+  $('opt-beginner').addEventListener('change', e => {
+    settings.beginner = e.target.checked;
+    if (settings.beginner) settings.toured = {};   // turning it on replays the guide tours
+    saveSettings();
+    applyBeginner();
+    toast(settings.beginner ? '도움말과 사용법 안내를 보여 줍니다' : '도움말을 숨깁니다');
+  });
   $('opt-dev').addEventListener('change', e => {
     settings.dev = e.target.checked;
     saveSettings();
@@ -387,6 +448,7 @@ async function renderHome() {
     }
     list.append(li);
   }
+  if (!editing() && !document.body.classList.contains('in-settings')) maybeTour('home');
 }
 
 // Assets load in the background; drafts can be listed before they arrive.
@@ -456,6 +518,7 @@ function enterEditor() {
   document.body.classList.add('editing');
   $('home').inert = true;
   if (!window.history.state?.editor) window.history.pushState({ editor: true }, '');
+  setTimeout(() => { if (editing()) maybeTour('editor'); }, 450);
 }
 
 // Leaves the editor. `keep` false skips saving (the draft was just deleted).
@@ -1417,6 +1480,7 @@ function wire() {
   wireSettings();
   ready = init();
   ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
+  applyBeginner();
   store.persist();
   store.sweepTrash().catch(() => {});
   renderHome();
