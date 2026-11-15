@@ -463,6 +463,7 @@ body[data-nav=arc] .editor > .tabbar, body[data-nav=knob] .editor > .tabbar { di
 }
 .knob::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; border: 1px dashed var(--control-on); }
 .knob-mark { position: absolute; left: 50%; top: 7px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: var(--primary); }
-/* C: the bar curves like a wheel rim while dragged */
+/* C: the familiar bar bends gently only while dragged */
 .tabbar.curving button { transition: none; }
-.tabbar button.settle { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }
+.tabbar button.settle { transition: transform .28s cubic-bezier(.34, 1.2, .64, 1); }
+@media (prefers-reduced-motion: reduce) { .tabbar button.settle { transition: none; } }

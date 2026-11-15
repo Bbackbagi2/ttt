@@ -1337,11 +1337,11 @@ function wireTabSlider() {
 }
 
 // ---------------------------------------------------------------- menu style prototypes
-// Developer mode can swap the tab bar for one of three trials: Arc (a camera-style dial),
-// Knob (a round knob turned by circling it) and Curve (the bar bends like a wheel rim while
-// dragged). Bar is the normal tab bar.
+// Developer mode compares the normal bar with a shallow curve during drag.
+// Earlier Arc and Knob trials remain below but are not offered in this prototype.
 
-const navStyle = () => (settings.dev ? settings.nav || 'bar' : 'bar');
+// Keep the familiar bar at rest. The curved drag is the only active alternative trial.
+const navStyle = () => (settings.dev && settings.nav === 'curve' ? 'curve' : 'bar');
 const tabLabel = b => [...b.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
 let navDriving = false;   // a dial or knob is switching tabs itself
 
@@ -1362,8 +1362,8 @@ function applyNav() {
 
 function syncNav(i, instant = false) {
   if (navDriving) return;
-  arcTo(i, instant);
-  knobTo(i, instant);
+  if (navStyle() === 'arc') arcTo(i, instant);
+  if (navStyle() === 'knob') knobTo(i, instant);
 }
 
 // A spring that moves `state.pos` toward `state.target` and repaints each frame.
@@ -1551,21 +1551,31 @@ function wireKnob() {
   el.addEventListener('pointercancel', end);
 }
 
-// ---- C: the bar bends like the rim of a wheel around the finger while dragged
+// ---- C: a shallow curve appears only while the familiar bar is dragged
+let curveSettleTimer = 0;
 function curveBar(on) {
   const bar = $('tabs');
   if (navStyle() !== 'curve') return;
+  clearTimeout(curveSettleTimer);
   if (!on) {
     bar.classList.remove('curving');
     tabButtons().forEach(b => { b.classList.add('settle'); b.style.transform = ''; });
-    setTimeout(() => tabButtons().forEach(b => b.classList.remove('settle')), 500);
+    curveSettleTimer = setTimeout(() => tabButtons().forEach(b => b.classList.remove('settle')), 300);
+    return;
+  }
+  tabButtons().forEach(b => b.classList.remove('settle'));
+  if (stillMotion()) {
+    bar.classList.remove('curving');
+    tabButtons().forEach(b => { b.style.transform = ''; });
     return;
   }
   bar.classList.add('curving');
-  const centre = pill.x + pill.w / 2, w = bar.clientWidth;
+  const centre = pill.x + pill.w / 2, radius = bar.clientWidth * .48;
   tabButtons().forEach(b => {
-    const d = (b.offsetLeft + b.offsetWidth / 2 - centre) / w;
-    b.style.transform = `translateY(${d * d * 70}px) rotate(${d * 30}deg)`;
+    const d = (b.offsetLeft + b.offsetWidth / 2 - centre) / radius;
+    const near = Math.max(0, 1 - d * d);
+    const tilt = Math.max(-1, Math.min(1, d)) * -5;
+    b.style.transform = `translateY(${-8 * (1 - near)}px) rotate(${tilt}deg)`;
   });
 }
 
