@@ -56,8 +56,15 @@ h1 { margin: 0; }
 }
 
 /* ------------------------------------------------------------ home */
-.home { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 32px) 16px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 32px); }
-.home-head { margin-bottom: 28px; }
+.home { max-width: 560px; margin: 0 auto; padding: 0 16px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 32px); }
+/* The header stays at the top on a solid background, so content scrolls under it instead of
+   under the status bar, where iOS blurs it. A hairline shows once the page is scrolled. */
+.home-head {
+  position: sticky; top: 0; z-index: 5; margin: 0 -16px 20px;
+  padding: calc(env(safe-area-inset-top) + 24px) 16px 14px;
+  background: var(--bg); border-bottom: 1px solid transparent; transition: border-color .2s;
+}
+.home-head.scrolled { border-bottom-color: var(--line); }
 .eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
 h1 { font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }

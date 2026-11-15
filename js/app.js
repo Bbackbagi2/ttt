@@ -1063,6 +1063,9 @@ function wire() {
   window.addEventListener('orientationchange', () => setTimeout(fitHeight, 300));
   window.addEventListener('pageshow', fitHeight);
   watchBars();
+  window.addEventListener('scroll', () => {
+    $('home').querySelector('.home-head').classList.toggle('scrolled', window.scrollY > 4);
+  }, { passive: true });
   $('screen-note').addEventListener('toggle', e => { if (e.target.open) showScreenInfo(); });
   wire();
   wireNavigation();
