@@ -133,7 +133,9 @@ body.editing .home { transform: translateX(-22%); opacity: .35; }
 /* bottom navigation */
 .tabbar {
   display: grid; grid-template-columns: repeat(5, 1fr);
-  padding: 6px 4px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 6px);
+  /* Close to the bottom edge: the labels only need to clear the home indicator bar itself
+     (about 13 pt up), not the whole 34 pt inset, which made the bar look lifted. */
+  padding: 8px 4px max(6px, calc(var(--safe-bottom, env(safe-area-inset-bottom)) - 16px));
   background: var(--bg); border-top: 1px solid var(--line);
 }
 .tabbar button {
