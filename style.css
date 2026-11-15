@@ -82,8 +82,20 @@ h1 { font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
 /* Pinned to the screen edges instead of 100dvh: iOS can report a short viewport height at launch
    (home-screen app, before the first scroll), which left the tab bar floating above the bottom. */
 .editor {
-  position: fixed; inset: 0; max-width: 560px; margin: 0 auto;
+  position: fixed; top: 0; left: 0; right: 0; height: var(--app-h, 100dvh);
+  max-width: 560px; margin: 0 auto; z-index: 10; background: var(--bg);
   display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+  transform: translateX(100%);
+  transition: transform .38s cubic-bezier(.32, .72, 0, 1);
+  box-shadow: -10px 0 32px rgba(0, 0, 0, .45);
+}
+body.editing .editor { transform: none; }
+/* the home screen eases back underneath, like an iOS navigation stack */
+.home { transition: transform .38s cubic-bezier(.32, .72, 0, 1), opacity .38s; }
+body.editing { overflow: hidden; }
+body.editing .home { transform: translateX(-22%); opacity: .35; }
+@media (prefers-reduced-motion: reduce) {
+  .editor, .home { transition: none; }
 }
 .bar {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px;
@@ -235,7 +247,7 @@ textarea { resize: none; min-height: 170px; line-height: 1.55; }
 /* ------------------------------------------------------------ full post preview */
 .bar-end { display: flex; align-items: center; gap: 6px; }
 .sheet {
-  position: fixed; inset: 0; z-index: 30; background: #000;
+  position: fixed; top: 0; left: 0; right: 0; height: var(--app-h, 100dvh); z-index: 30; background: #000;
   display: grid; grid-template-rows: auto minmax(0, 1fr);
 }
 .sheet-bar {

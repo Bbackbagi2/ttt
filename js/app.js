@@ -12,10 +12,26 @@ let future = [];              // settings undone, for redo
 let lastCheck = { key: '', time: 0 };
 let behind = { key: null, canvas: null };   // first body photo fitted to 3:4, seen through the window
 const COVER_KEYS = ['composition', 'seed', 'layout', 'vertical', 'mode', 'window', 'titleLength', 'titleSize'];
-const urls = new Set();
+const urls = new Set();       // object URLs made by the editor
+const homeUrls = new Set();   // object URLs of the draft thumbnails on the home screen
 
-function url(blob) { const u = URL.createObjectURL(blob); urls.add(u); return u; }
-function releaseUrls() { urls.forEach(u => URL.revokeObjectURL(u)); urls.clear(); }
+function url(blob, set = urls) { const u = URL.createObjectURL(blob); set.add(u); return u; }
+function releaseUrls(set = urls) { set.forEach(u => URL.revokeObjectURL(u)); set.clear(); }
+
+// ---------------------------------------------------------------- screen height
+// A home-screen app has no Safari toolbar, but iOS can still size the page at launch as if the
+// toolbar were there, which left the tab bar floating above the bottom. There the editor takes
+// the full screen height instead.
+function fitHeight() {
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  let h = window.innerHeight;
+  if (standalone) {
+    const portrait = matchMedia('(orientation: portrait)').matches;
+    const [a, b] = [screen.width, screen.height];
+    h = Math.max(h, portrait ? Math.max(a, b) : Math.min(a, b));
+  }
+  document.documentElement.style.setProperty('--app-h', h + 'px');
+}
 
 function toast(text) {
   const t = $('toast');
@@ -61,22 +77,19 @@ function pickPicture(comps) {
 
 // ---------------------------------------------------------------- home
 
-async function showHome() {
-  releaseUrls();
-  draft = null;
-  $('editor').hidden = true;
-  $('home').hidden = false;
+async function renderHome() {
   const drafts = await store.list();
   $('draft-count').textContent = `${drafts.length} / ${store.LIMIT}`;
   $('new-draft').disabled = drafts.length >= store.LIMIT;
   $('empty').hidden = drafts.length > 0;
   const list = $('drafts');
+  releaseUrls(homeUrls);
   list.replaceChildren();
   for (const d of drafts) {
     const li = document.createElement('li');
     const b = document.createElement('button');
     const img = document.createElement('img');
-    if (d.thumb) img.src = url(d.thumb);
+    if (d.thumb) img.src = url(d.thumb, homeUrls);
     img.alt = '';
     const meta = document.createElement('span');
     meta.className = 'meta';
@@ -128,9 +141,6 @@ async function openDraft(id) {
 function openEditor() {
   releaseUrls();
   prepared = null;
-  $('home').hidden = true;
-  $('editor').hidden = false;
-  window.scrollTo(0, 0);
   $('title').value = draft.title;
   $('fallback').hidden = true;
   $('export-status').textContent = '';
@@ -147,6 +157,84 @@ function openEditor() {
   renderPhotos();
   syncCaption();
   schedule();
+  enterEditor();
+}
+
+// ---------------------------------------------------------------- moving between home and editor
+// The editor slides in over the home screen like an iOS page. Opening it adds a history entry, so
+// the back button, Safari's back gesture and a swipe from the left edge all lead home the same way.
+
+const editing = () => document.body.classList.contains('editing');
+
+function enterEditor() {
+  const ed = $('editor');
+  ed.hidden = false;
+  $('editor').querySelector('.panels').scrollTop = 0;
+  ed.getBoundingClientRect();           // start the slide from off screen
+  document.body.classList.add('editing');
+  $('home').inert = true;
+  if (!window.history.state?.editor) window.history.pushState({ editor: true }, '');
+}
+
+// Leaves the editor. `keep` false skips saving (the draft was just deleted).
+async function closeEditor(keep = true) {
+  if (!editing()) return;
+  clearTimeout(saveTimer); clearTimeout(renderTimer);
+  $('sheet').hidden = true;
+  document.body.classList.remove('editing');
+  $('home').inert = false;
+  setTimeout(() => { if (!editing()) $('editor').hidden = true; }, 420);
+  const d = keep ? draft : null;
+  // A change made just before leaving may not be drawn yet; draw it so the thumbnail matches.
+  if (d && dirty) { await drawCover(); clearTimeout(saveTimer); }
+  if (draft === d || !keep) draft = null;
+  if (d) await persistDraft(d);
+  await renderHome();
+}
+
+function goHome(keep = true) {
+  closeEditor(keep);
+  if (window.history.state?.editor) window.history.back();
+}
+
+function wireNavigation() {
+  window.addEventListener('popstate', () => {
+    const st = window.history.state || {};
+    if (!st.sheet && !$('sheet').hidden) $('sheet').hidden = true;
+    if (!st.editor && editing()) closeEditor();
+  });
+  // Swipe right from the left edge to go back, following the finger.
+  const ed = $('editor');
+  let s = null;
+  ed.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    s = e.touches.length === 1 && t.clientX < 24 && $('sheet').hidden ? { x: t.clientX, y: t.clientY, dx: 0, on: false } : null;
+  }, { passive: true });
+  ed.addEventListener('touchmove', e => {
+    if (!s) return;
+    const t = e.touches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (!s.on) {
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) { s = null; return; }
+      if (dx < 10) return;
+      s.on = true;
+      ed.style.transition = 'none';
+      $('home').style.transition = 'none';
+    }
+    s.dx = Math.max(0, dx);
+    const k = s.dx / window.innerWidth;
+    ed.style.transform = `translateX(${s.dx}px)`;
+    $('home').style.transform = `translateX(${-22 * (1 - k)}%)`;
+    $('home').style.opacity = String(.35 + .65 * k);
+  }, { passive: true });
+  const end = () => {
+    if (!s?.on) { s = null; return; }
+    const far = s.dx > window.innerWidth * .28;
+    s = null;
+    for (const el of [ed, $('home')]) { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; }
+    if (far) goHome();
+  };
+  ed.addEventListener('touchend', end);
+  ed.addEventListener('touchcancel', end);
 }
 
 // ---------------------------------------------------------------- undo
@@ -220,8 +308,9 @@ function syncControls() {
   $('photo-count').textContent = draft.photos.length || '';
 }
 
-let renderTimer = 0, saveTimer = 0;
+let renderTimer = 0, saveTimer = 0, dirty = false;
 function schedule() {
+  dirty = true;
   prepared = null;
   $('export-label').textContent = 'Prepare images';
   clearTimeout(renderTimer);
@@ -230,6 +319,7 @@ function schedule() {
 
 async function drawCover() {
   if (!draft) return;
+  dirty = false;
   const canvas = $('cover');
   const back = normalize(draft).mode === 'window' ? await behindPhoto() : null;
   const result = await render(canvas, draft, { behind: back });
@@ -249,8 +339,15 @@ async function behindPhoto() {
   return behind.canvas;
 }
 
-async function persistDraft() {
-  if (!draft) return;
+// The save in progress, so deleting a draft can wait for it instead of racing it.
+let saving = Promise.resolve();
+function persistDraft(d = draft) {
+  if (!d) return saving;
+  saving = saving.then(() => saveDraft(d), () => saveDraft(d));
+  return saving;
+}
+
+async function saveDraft(draft) {
   const small = document.createElement('canvas');
   small.width = 162; small.height = 216;
   small.getContext('2d').drawImage($('cover'), 0, 0, 162, 216);
@@ -507,6 +604,7 @@ async function openPreview() {
     grid.append(cell);
   }
   $('sheet').hidden = false;
+  if (!window.history.state?.sheet) window.history.pushState({ editor: true, sheet: true }, '');
   feedSlide = 0;
   box.scrollLeft = 0;
   showPreviewMode('feed');
@@ -640,16 +738,23 @@ async function posted() {
       && confirm(`이번 표지 그림("${item.name}")을 사용한 그림으로 표시할까요?\n표시하면 그림 목록 맨 아래로 가고 체크가 붙습니다.`)) {
     setUsed(item.id, true);
   }
-  await store.remove(draft.id);
+  await discard();
+}
+
+// Deletes the open draft: stops autosave first, waits for a save already running, then removes it.
+async function discard() {
+  clearTimeout(saveTimer); clearTimeout(renderTimer);
+  const id = draft.id;
+  draft = null;
+  await saving.catch(() => {});
+  await store.remove(id);
   toast('초안을 지웠습니다');
-  showHome();
+  goHome(false);
 }
 
 async function finish(message) {
   if (!confirm(message)) return;
-  await store.remove(draft.id);
-  toast('초안을 지웠습니다');
-  showHome();
+  await discard();
 }
 
 // ---------------------------------------------------------------- drag to pan the window photo
@@ -698,7 +803,7 @@ function showTab(name) {
 
 function wire() {
   $('new-draft').addEventListener('click', newDraft);
-  $('back').addEventListener('click', async () => { clearTimeout(saveTimer); await persistDraft(); showHome(); });
+  $('back').addEventListener('click', () => goHome());
   $('title').addEventListener('input', e => { draft.title = e.target.value; syncDirection(); schedule(); });
   $('direction').addEventListener('click', e => {
     const v = e.target.closest('button')?.dataset.v;
@@ -806,7 +911,9 @@ function wire() {
     if (i !== slide && i >= 0 && i < slideCount()) { slide = i; syncSlide(); }
   }, { passive: true });
   $('open-preview').addEventListener('click', openPreview);
-  $('close-preview').addEventListener('click', () => { $('sheet').hidden = true; });
+  $('close-preview').addEventListener('click', () => {
+    if (window.history.state?.sheet) window.history.back(); else $('sheet').hidden = true;
+  });
   $('preview-mode').addEventListener('click', e => {
     const v = e.target.closest('button')?.dataset.v;
     if (v) showPreviewMode(v);
@@ -836,9 +943,14 @@ function wire() {
 }
 
 (async () => {
+  // A reload while editing leaves an editor history entry behind; start from home.
+  if (window.history.state) window.history.replaceState(null, '');
+  fitHeight();
+  window.addEventListener('resize', fitHeight);
   wire();
+  wireNavigation();
   ready = init();
   ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   store.persist();
-  showHome();
+  renderHome();
 })();
