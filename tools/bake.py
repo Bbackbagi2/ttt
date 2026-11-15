@@ -332,20 +332,23 @@ def generated(painter, photos, count, seed=2026):
 
 
 def wheel(painter, tile_file):
-    """An original abstract wheel, painted and glazed like the library marks."""
+    """A rolling wheel suggested by uneven arcs and a short trailing mark."""
     clay, ink, accent = GLAZES['cream']
-    center = SIDE // 2
-    rim = 124
+    cx, cy, rim = 247, 206, 116
     lines = Image.new('RGBA', (SIDE, SIDE))
     draw = ImageDraw.Draw(lines)
-    box = (center - rim, center - rim, center + rim, center + rim)
-    draw.arc(box, 27, 313, fill='white', width=23)
-    draw.line([(128, 276), (172, 251), (198, 238)], fill='white', width=19, joint='curve')
-    draw.line([(257, 209), (286, 187), (322, 158)], fill='white', width=16, joint='curve')
-    art = painter.brushed(lines, ink, seed=614)
+    box = (cx - rim, cy - rim, cx + rim, cy + rim)
+    draw.arc(box, 196, 346, fill='white', width=26)
+    draw.arc(box, 1, 181, fill='white', width=17)
+    draw.line([(179, 274), (211, 240), (232, 222)], fill='white', width=18, joint='curve')
+    draw.line([(258, 194), (283, 173), (318, 133)], fill='white', width=14, joint='curve')
+    trail = Image.new('RGBA', lines.size)
+    ImageDraw.Draw(trail).polygon([(67, 340), (105, 332), (151, 328), (206, 329),
+                                  (240, 325), (227, 338), (153, 344), (105, 345)], fill='white')
+    art = painter.brushed(trail, '#7796b0', seed=73)
+    art.alpha_composite(painter.brushed(lines, ink, seed=316))
     hub = Image.new('RGBA', art.size)
-    r = 17
-    ImageDraw.Draw(hub).ellipse((center - r, center - r, center + r, center + r), fill='white')
+    ImageDraw.Draw(hub).ellipse((cx - 15, cy - 14, cx + 15, cy + 14), fill='white')
     art.alpha_composite(painter.brushed(hub, accent, seed=528))
     with Image.open(tile_file) as image:
         surface = glazed_picture(photo_layers(image.convert('RGBA')), clay, art)
