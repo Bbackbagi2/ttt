@@ -42,6 +42,8 @@ function safeAreas() {
 const typing = () => document.body.classList.contains('typing');
 
 // Lays the editor out over the area iOS actually shows, measured each time it can change.
+// Measured on an iPhone 16 Pro home-screen app (iOS 27.2, 2026-11-15): inner 812 of 874, safe
+// area top 0 / bottom 34 with the opaque status bar.
 function fitHeight() {
   const standalone = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
   const short = Math.min(screen.width, screen.height), long = Math.max(screen.width, screen.height);
@@ -69,9 +71,7 @@ function fitHeight() {
   if (clipped) root.setProperty('--safe-bottom', '0px');
   else root.removeProperty('--safe-bottom');
   document.documentElement.dataset.screen = reference ? 'reference' : 'scaled';
-  fitHeight.last = { standalone, screen: `${screen.width}×${screen.height}`, inner: `${innerWidth}×${innerHeight}`,
-    visual: vv ? `${Math.round(vv.width)}×${h} @${top}` : '-', client: document.documentElement.clientHeight,
-    safe, shortfall, clipped, dpr: devicePixelRatio, stage };
+  fitHeight.last = { h, top };
 }
 
 // The fixed top bar and tab bar keep their room in the editor as their sizes change.
@@ -84,19 +84,6 @@ function watchBars() {
   });
   ro.observe($('editor').querySelector('.bar'));
   ro.observe($('tabs'));
-}
-
-// What this device reports, for checking the layout on a phone.
-function showScreenInfo() {
-  fitHeight();
-  const i = fitHeight.last, bar = $('tabs').getBoundingClientRect();
-  $('screen-info').textContent = [
-    `standalone ${i.standalone}`, `screen ${i.screen} · dpr ${i.dpr}`, `inner ${i.inner}`,
-    `visual ${i.visual}`, `client height ${i.client}`, `safe top ${i.safe.top} · bottom ${i.safe.bottom}`,
-    `shortfall ${i.shortfall} · clipped ${i.clipped}`, `stage ${i.stage}`,
-    `status bar ${document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').content}`,
-    navigator.userAgent.replace(/^Mozilla\/5\.0 /, ''),
-  ].join('\n');
 }
 
 function toast(text) {
@@ -143,8 +130,7 @@ function pickPicture(comps) {
 
 // ---------------------------------------------------------------- home
 
-// Home: the three draft slots as cover cards (empty ones start a new post), and a strip of
-// pictures to start from, unused first.
+// Home: the three draft slots as cover cards; empty ones start a new post.
 async function renderHome() {
   const drafts = await store.list();
   $('draft-count').textContent = `${drafts.length} / ${store.LIMIT}`;
@@ -179,36 +165,6 @@ async function renderHome() {
     }
     list.append(li);
   }
-  renderStarters(drafts.length);
-}
-
-function renderStarters(count) {
-  if (!catalog) return;
-  if (count !== undefined) renderStarters.count = count;
-  const full = (renderStarters.count ?? 0) >= store.LIMIT;
-  const used = usedPictures();
-  const comps = [...catalog.compositions].sort((a, b) => !!used[a.id] - !!used[b.id]);
-  $('used-count').textContent = `사용 ${catalog.compositions.filter(c => used[c.id]).length} / ${catalog.compositions.length}`;
-  const box = $('starters');
-  box.replaceChildren(...comps.map(c => {
-    const b = document.createElement('button');
-    if (used[c.id]) b.className = 'used';
-    b.setAttribute('aria-label', `${c.name}로 새 초안` + (used[c.id] ? ' (사용함)' : ''));
-    const img = document.createElement('img');
-    img.src = 'assets/' + c.thumb; img.alt = ''; img.loading = 'lazy';
-    b.append(img);
-    if (used[c.id]) {
-      const mark = document.createElement('span');
-      mark.className = 'used-mark';
-      mark.append(icon('check', 'ic sm'));
-      b.append(mark);
-    }
-    b.addEventListener('click', () => {
-      if (full) { toast(`초안은 ${store.LIMIT}개까지입니다. 하나를 마치거나 지운 뒤 시작해 주세요.`); return; }
-      newDraft(c.id);
-    });
-    return b;
-  }));
 }
 
 // Assets load in the background; drafts can be listed before they arrive.
@@ -1219,11 +1175,11 @@ function wire() {
   window.addEventListener('scroll', () => {
     $('home').querySelector('.home-head').classList.toggle('scrolled', window.scrollY > 4);
   }, { passive: true });
-  $('screen-note').addEventListener('toggle', e => { if (e.target.open) showScreenInfo(); });
+
   wire();
   wireNavigation();
   ready = init();
-  ready.then(c => { catalog = c; renderStarters(); }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
+  ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   store.persist();
   renderHome();
 })();
