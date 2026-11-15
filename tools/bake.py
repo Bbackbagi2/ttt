@@ -331,6 +331,30 @@ def generated(painter, photos, count, seed=2026):
     return items
 
 
+def wheel(painter, tile_file):
+    """An original abstract wheel, painted and glazed like the library marks."""
+    clay, ink, accent = GLAZES['cream']
+    center = SIDE // 2
+    rim = 124
+    lines = Image.new('RGBA', (SIDE, SIDE))
+    draw = ImageDraw.Draw(lines)
+    box = (center - rim, center - rim, center + rim, center + rim)
+    draw.arc(box, 27, 313, fill='white', width=23)
+    draw.line([(128, 276), (172, 251), (198, 238)], fill='white', width=19, joint='curve')
+    draw.line([(257, 209), (286, 187), (322, 158)], fill='white', width=16, joint='curve')
+    art = painter.brushed(lines, ink, seed=614)
+    hub = Image.new('RGBA', art.size)
+    r = 17
+    ImageDraw.Draw(hub).ellipse((center - r, center - r, center + r, center + r), fill='white')
+    art.alpha_composite(painter.brushed(hub, accent, seed=528))
+    with Image.open(tile_file) as image:
+        surface = glazed_picture(photo_layers(image.convert('RGBA')), clay, art)
+    picture = 'pictures/wheel.png'
+    Image.fromarray(np.uint8(np.round(surface))).save(OUT / picture, optimize=True)
+    return {'id': 'wheel', 'name': '바퀴', 'kind': 'geometric', 'palette': 'cream',
+            'picture': picture, 'source': 'original'}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project', required=True, type=Path)
@@ -385,6 +409,7 @@ def main():
                         'title_rect': [tx, ty, tw, th]},
         })
 
+    painter = Painter(libraries / 'brush-library')
     if args.generated:
         photos = []
         for file in sorted((libraries / 'small-tile-library').glob('tile-*.png')):
@@ -392,7 +417,8 @@ def main():
                 photos.append(photo_layers(image.convert('RGBA')))
         order = np.argsort([np.median(p[0]) for p in photos])
         photos = [photos[i] for i in order]
-        compositions += generated(Painter(libraries / 'brush-library'), photos, args.generated)
+        compositions += generated(painter, photos, args.generated)
+    compositions.append(wheel(painter, libraries / 'small-tile-library' / 'tile-62.png'))
 
     # Small previews for the picker, and home-screen icons.
     (OUT / 'thumbs').mkdir(exist_ok=True)

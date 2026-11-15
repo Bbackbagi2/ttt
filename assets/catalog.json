@@ -550,6 +550,15 @@
    "picture": "pictures/gen-24.png",
    "source": "generated",
    "thumb": "thumbs/gen-24.jpg"
+  },
+  {
+   "id": "wheel",
+   "name": "바퀴",
+   "kind": "geometric",
+   "palette": "cream",
+   "picture": "pictures/wheel.png",
+   "source": "original",
+   "thumb": "thumbs/wheel.jpg"
   }
  ]
 }
