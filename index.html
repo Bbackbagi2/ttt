@@ -151,7 +151,13 @@
           <div class="stepper" data-for="win-n"><button data-d="-1" aria-label="Smaller"><svg class="ic sm"><use href="#i-minus"/></svg></button><output id="win-n-out"></output><button data-d="1" aria-label="Larger"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
           <input id="win-n" type="range" min="1" max="7" step="1" hidden>
         </div>
-        <p class="hint">창은 벽에 뚫린 반투명 유리 구멍입니다. 다음 장(본문 첫 사진)의 같은 자리가 보여서, 표지에서 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
+        <div class="row">
+          <span class="label">유리</span>
+          <div id="glass-kind" class="segmented compact">
+            <button data-g="tile" class="on">Tile</button><button data-g="block">Block</button>
+          </div>
+        </div>
+        <p class="hint">창은 김 서린 큰 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
         <p id="window-nophoto" class="warn" hidden>본문 사진이 아직 없습니다. Photos 탭에서 추가하면 첫 장이 창 너머로 보입니다.</p>
       </div>
     </section>
@@ -256,6 +262,6 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
-<script type="module" src="js/app.js?v=15"></script>
+<script type="module" src="js/app.js?v=16"></script>
 </body>
 </html>

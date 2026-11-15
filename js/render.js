@@ -12,7 +12,7 @@ let atlas = null;           // ImageData of tiles.png
 const frames = {};          // plaque frames by "orient-length"
 const glazes = {};          // glaze filter images by orientation
 const pictures = new Map(); // composition id -> ImageData
-const steam = {};           // window condensation layers: fog (RGBA) and drops (normal + height)
+const steam = { glass: {} };  // window layers: glass kinds (relief + body), fog (RGBA), drops (normal + height)
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -40,8 +40,10 @@ export async function init() {
     font.load().then(f => document.fonts.add(f)),
     loadImage('assets/window/fog.png').then(img => { steam.fog = pixels(img); }),
     loadImage('assets/window/drops.png').then(img => { steam.drops = pixels(img); }),
-    loadImage('assets/window/tile.png').then(img => { steam.tile = pixels(img); }),
-    loadImage('assets/window/tile-body.png').then(img => { steam.body = pixels(img); }),
+    ...GLASSES.flatMap(kind => [
+      loadImage(`assets/window/glass-${kind}.png`).then(img => { steam.glass[kind] = { ...steam.glass[kind], relief: pixels(img) }; }),
+      loadImage(`assets/window/glass-${kind}-body.png`).then(img => { steam.glass[kind] = { ...steam.glass[kind], body: pixels(img) }; }),
+    ]),
   ];
   for (let n = 1; n <= MAXLEN; n++) {
     jobs.push(loadImage(`assets/plaque/square-${n}.png`).then(img => { frames[`square-${n}`] = pixels(img); }));
@@ -101,8 +103,9 @@ export function language(text) {
 export function normalize(spec) {
   const text = (spec.title || '').trim();
   const mode = spec.mode === 'window' ? 'window' : 'picture';
-  const win = Object.assign({ n: 5 }, spec.window || {}, { frost: FROST });
+  const win = Object.assign({ n: 5, glass: 'tile' }, spec.window || {}, { frost: FROST });
   win.n = clamp(Math.round(win.n), 1, 7);
+  if (!GLASSES.includes(win.glass)) win.glass = 'tile';
   return {
     mode, win, text,
     vertical: language(text) === 'ko' && !!spec.vertical,
@@ -250,27 +253,19 @@ function plaque(fit, colors, orient, w, h, rand) {
 // next slide (the first body photo, already fitted to 1080x1440) at the very same place,
 // so swiping from the cover to the photo continues the view.
 // The window is one large glass tile. Two kinds of real-image layers make it:
-//  - tile.png / tile-body.png: a photographed wall tile, enlarged to the window. Its edges and
-//    surface give the tile its real relief: R, G bend the view behind (128 = none), B is the
-//    light and shade of the surface, and tile-body is its milky brightness.
-//  - fog.png / drops.png: condensation on the glass (mist, drops and drip trails).
+//  - glass-<kind>.png / -body.png: a photographed glass tile or glass block, enlarged to the
+//    window. Its edges and surface give the real relief: R, G bend the view behind
+//    (128 = none), B is the light and shade of the surface, -body is its milky brightness.
+//    kinds: 'tile' (a clear wall tile) and 'block' (one cell of a glass block window).
+//  - fog.png / drops.png: condensation on the face of the glass (mist, drops, drip trails).
 // Behind the glass is the next slide (the first body photo) at the same place, so swiping from
 // the cover to the photo continues the view.
-export function setGlass(layer, body) {
-  steam.tile = layer;
-  steam.body = body;
-}
+export const GLASSES = ['tile', 'block'];
 
-// The tile's own glass over a colour channel: its milky body, then the light and shade of its relief.
-function glassTile(v, ch, body, shade) {
-  v += (GLASS[ch] * (.8 + .32 * body) - v) * .34;
-  return shade > 0 ? v + (255 - v) * shade * .55 : v * (1 + shade * .45);
-}
+const milky = (v, ch, body) => v + (GLASS[ch] * (.8 + .32 * body) - v) * .34;
+const relief = (v, shade) => (shade > 0 ? v + (255 - v) * shade * .55 : v * (1 + shade * .45));
 
-// 'glass' (default) or 'mist': which layer lies in front. See windowPane.
-export function setFront(front) { steam.front = front; }
-
-function windowPane(behind, x0, y0, n, frost, rand) {
+function windowPane(behind, x0, y0, n, frost, glass, rand) {
   const S = n * P, pad = 24, B = S + 2 * pad;
   const src = document.createElement('canvas');
   src.width = src.height = B;
@@ -296,43 +291,34 @@ function windowPane(behind, x0, y0, n, frost, rand) {
     return top + (data[c] + (data[d] - data[c]) * fx - top) * fy;
   };
 
-  // The photographed tile is stretched over the whole window; the condensation is cropped.
-  const tile = steam.tile, NT = tile ? tile.width : 1, kt = NT / S;
-  const td = tile?.data, milk = steam.body?.data;
+  // The glass is stretched over the whole window; the condensation is cropped.
+  const tile = steam.glass[glass] || steam.glass.tile;
+  const NT = tile.relief.width, kt = NT / S, td = tile.relief.data, milk = tile.body.data;
   const T = steam.fog.width;
   const ox = Math.floor(rand() * Math.max(1, T - S)), oy = Math.floor(rand() * Math.max(1, T - S));
   const fog = steam.fog.data, drops = steam.drops.data;
   const thick = clamp(frost / FROST, 0, 1.6);
   const BEND = 11;
-
-  // Which layer is nearer the viewer: 'glass' puts the tile's milk and relief over the
-  // condensation (the water is inside or behind the glass); 'mist' puts the water on its face.
-  const mistFront = steam.front === 'mist';
-  // Drops thin out toward the tile's rim, most on the top and left where the photographed
-  // tile shows its raised, lit edge; there the mist is even instead of beaded.
+  // Drops thin out toward the rim, most on the top and left where the glass shows its raised,
+  // lit edge; there the mist is even instead of beaded.
   const smooth = v => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
   const wl = S * .1, wt = S * .1, wr = S * .055, wb = S * .055;
+
   const out = new ImageData(S, S), o = out.data;
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const k = (y * S + x) * 4;
-      let bx = 0, by = 0, shade = 0, body = .5;
-      if (td) {
-        const ti = (Math.min(NT - 1, (y * kt) | 0) * NT + Math.min(NT - 1, (x * kt) | 0)) * 4;
-        bx = (td[ti] - 128) / 127 * BEND;
-        by = (td[ti + 1] - 128) / 127 * BEND;
-        shade = (td[ti + 2] - 128) / 127;
-        if (milk) body = milk[ti] / 255;
-      }
+      const ti = (Math.min(NT - 1, (y * kt) | 0) * NT + Math.min(NT - 1, (x * kt) | 0)) * 4;
+      const bx = (td[ti] - 128) / 127 * BEND, by = (td[ti + 1] - 128) / 127 * BEND;
+      const shade = (td[ti + 2] - 128) / 127, body = milk[ti] / 255;
       const e = Math.min(smooth(x / wl - .25), smooth(y / wt - .25), smooth((S - x) / wr - .25), smooth((S - y) / wb - .25));
       const t = ((oy + y) % T * T + (ox + x) % T) * 4;
       const cap = drops[t + 2] / 255 * e;
-      // Mist: the view goes soft and pale where it is thick.
       let f = clamp(fog[t + 3] / 255 * thick, 0, 1);
       f += (.5 * thick - f) * (1 - e);
       const blur = Math.min(1, f * 1.5), white = f * .55;
       const sx = x + pad + bx, sy = y + pad + by;
-      let nx = 0, ny = 0, bend = 0, rim = 1, lit = 0, spec = 0;
+      let nx = 0, ny = 0, bend = 0, rim = 1, lit = 0, spec = 0, under = 0;
       if (cap > 0) {
         // A drop is a small lens: it shows the view flipped and a little sharper,
         // darkens toward its rim and carries a highlight from the upper-left light.
@@ -342,19 +328,24 @@ function windowPane(behind, x0, y0, n, frost, rand) {
         lit = Math.max(0, nx * .55 + ny * .8);
         const d = Math.hypot(nx + .36, ny + .46);
         spec = cap > .25 ? Math.max(0, 1 - d / .24) ** 2 : 0;
+      } else {
+        // A drop on the face of the glass casts a faint shadow down and to the right.
+        const u = ((oy + y - 3 + T) % T * T + (ox + x - 2 + T) % T) * 4;
+        under = drops[u + 2] / 255 * e;
       }
+      const mix = Math.min(1, e * 1.4);
       for (let ch = 0; ch < 3; ch++) {
+        // The view through the glass, then the water on its face: the mist follows the
+        // glass relief and the drops sit on top of everything.
         const a = sample(sharp, sx, sy, ch);
-        let v = a + (sample(soft, sx, sy, ch) - a) * blur;
-        if (mistFront) v = glassTile(v, ch, body, shade);
+        let v = milky(a + (sample(soft, sx, sy, ch) - a) * blur, ch, body);
         v += (fog[t + ch] - v) * white;
+        v = relief(v, shade) * (1 - .14 * under);
         if (cap > 0) {
-          let w = sample(sharp, sx - nx * bend, sy - ny * bend, ch);
-          if (mistFront) w = glassTile(w, ch, body, shade);
-          w = w * rim + 12 + 95 * lit * lit * (1 - cap) + 235 * spec;
-          v += (w - v) * Math.min(1, e * 1.4);
+          const w = milky(sample(sharp, sx - nx * bend, sy - ny * bend, ch), ch, body) * rim + 14 + 95 * lit * lit * (1 - cap);
+          v += (w - v) * mix;
+          v += (255 - v) * spec * .92 * mix;
         }
-        if (!mistFront) v = glassTile(v, ch, body, shade);
         o[k + ch] = v;
       }
       o[k + 3] = 255;
@@ -455,7 +446,7 @@ export async function render(canvas, spec, extra = {}) {
       d.set(pic.data.subarray(y * SIDE * 4, (y + 1) * SIDE * 4), ((py * P + y) * W + px * P) * 4);
     }
   } else {
-    const pane = windowPane(extra.behind, px * P, py * P, s.block, s.win.frost, rand);
+    const pane = windowPane(extra.behind, px * P, py * P, s.block, s.win.frost, s.win.glass, rand);
     const frame = frames[`square-${s.block}`];
     const S = s.block * P;
     for (let y = 0; y < S; y++) {

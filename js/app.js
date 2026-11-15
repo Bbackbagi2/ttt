@@ -1,4 +1,4 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=12';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=13';
 import * as store from './store.js?v=8';
 
 const $ = id => document.getElementById(id);
@@ -309,6 +309,7 @@ function syncControls() {
   $('cover').classList.toggle('grab', s.mode === 'window');
   $('window-nophoto').hidden = !!draft.photos.length;
   $('win-n').value = s.win.n; $('win-n-out').textContent = `${s.win.n} × ${s.win.n}칸`;
+  for (const b of $('glass-kind').querySelectorAll('button')) b.classList.toggle('on', b.dataset.g === s.win.glass);
   $('title-length').value = s.length; $('length-out').textContent = `${s.length}칸`;
   $('size-auto').classList.toggle('on', !s.size);
   $('size-manual').classList.toggle('on', !!s.size);
@@ -837,6 +838,13 @@ function wire() {
     syncControls(); schedule();
   });
   winSlider('win-n', 'n', 1);
+  $('glass-kind').addEventListener('click', e => {
+    const kind = e.target.closest('button')?.dataset.g;
+    if (!kind || normalize(draft).win.glass === kind) return;
+    checkpoint('glass');
+    draft.window = Object.assign({}, normalize(draft).win, { glass: kind });
+    syncControls(); schedule();
+  });
   $('title-length').addEventListener('input', e => {
     checkpoint('title-length');
     draft.titleLength = +e.target.value; draft.layout = 0;
