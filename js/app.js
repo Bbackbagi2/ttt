@@ -26,24 +26,65 @@ function releaseUrls(set = urls) { set.forEach(u => URL.revokeObjectURL(u)); set
 // report a bottom safe-area inset; see fitHeight.
 const REFERENCE = { width: 402, height: 874, stage: 384 };
 
+// Safe-area insets as numbers, read from a hidden probe sized by env().
+function safeAreas() {
+  let probe = document.getElementById('safe-probe');
+  if (!probe) {
+    probe = document.createElement('div');
+    probe.id = 'safe-probe';
+    document.body.append(probe);
+  }
+  const r = probe.getBoundingClientRect();
+  return { top: Math.round(r.height), bottom: Math.round(r.width) };
+}
+
+// Lays the editor out over the area iOS actually shows, measured each time it can change.
 function fitHeight() {
-  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const standalone = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
   const short = Math.min(screen.width, screen.height), long = Math.max(screen.width, screen.height);
   const portrait = matchMedia('(orientation: portrait)').matches;
-  // The page gets only the height iOS gives it; sizing it to the full screen hid the tab bar labels.
-  const h = window.innerHeight;
+  const vv = window.visualViewport;
+  const top = vv ? Math.max(0, Math.round(vv.offsetTop)) : 0;
+  const h = Math.round(vv ? vv.height : window.innerHeight);
   const reference = short === REFERENCE.width && long === REFERENCE.height;
   const stage = reference ? REFERENCE.stage
     : Math.round(Math.min(460, Math.max(240, REFERENCE.stage * long / REFERENCE.height)));
   const root = document.documentElement.style;
+  root.setProperty('--app-top', top + 'px');
   root.setProperty('--app-h', h + 'px');
   root.setProperty('--stage-h', stage + 'px');
   // When a home-screen app's page stops short of the screen bottom, the home indicator is not over
   // the page, so its safe-area inset would only lift the tab bar off the bottom.
-  const shortfall = (portrait ? long : short) - h;
+  const shortfall = (portrait ? long : short) - (top + h);
   if (standalone && shortfall > 40) root.setProperty('--safe-bottom', '0px');
   else root.removeProperty('--safe-bottom');
   document.documentElement.dataset.screen = reference ? 'reference' : 'scaled';
+  fitHeight.last = { standalone, screen: `${screen.width}×${screen.height}`, inner: `${innerWidth}×${innerHeight}`,
+    visual: vv ? `${Math.round(vv.width)}×${h} @${top}` : '-', client: document.documentElement.clientHeight,
+    safe: safeAreas(), shortfall, dpr: devicePixelRatio, stage };
+}
+
+// The fixed top bar and tab bar keep their room in the editor as their sizes change.
+function watchBars() {
+  const root = document.documentElement.style;
+  const ro = new ResizeObserver(() => {
+    root.setProperty('--bar-h', $('editor').querySelector('.bar').offsetHeight + 'px');
+    root.setProperty('--tab-h', $('tabs').offsetHeight + 'px');
+  });
+  ro.observe($('editor').querySelector('.bar'));
+  ro.observe($('tabs'));
+}
+
+// What this device reports, for checking the layout on a phone.
+function showScreenInfo() {
+  fitHeight();
+  const i = fitHeight.last, bar = $('tabs').getBoundingClientRect();
+  $('screen-info').textContent = [
+    `standalone ${i.standalone}`, `screen ${i.screen} · dpr ${i.dpr}`, `inner ${i.inner}`,
+    `visual ${i.visual}`, `client height ${i.client}`, `safe top ${i.safe.top} · bottom ${i.safe.bottom}`,
+    `shortfall ${i.shortfall}`, `stage ${i.stage}`, `tab bar ${Math.round(bar.height)} high`,
+    navigator.userAgent.replace(/^Mozilla\/5\.0 /, ''),
+  ].join('\n');
 }
 
 function toast(text) {
@@ -90,35 +131,72 @@ function pickPicture(comps) {
 
 // ---------------------------------------------------------------- home
 
+// Home: the three draft slots as cover cards (empty ones start a new post), and a strip of
+// pictures to start from, unused first.
 async function renderHome() {
   const drafts = await store.list();
   $('draft-count').textContent = `${drafts.length} / ${store.LIMIT}`;
-  $('new-draft').disabled = drafts.length >= store.LIMIT;
-  $('empty').hidden = drafts.length > 0;
-  const list = $('drafts');
+  const list = $('slots');
   releaseUrls(homeUrls);
   list.replaceChildren();
-  for (const d of drafts) {
+  for (let i = 0; i < store.LIMIT; i++) {
+    const d = drafts[i];
     const li = document.createElement('li');
-    const b = document.createElement('button');
-    const img = document.createElement('img');
-    if (d.thumb) img.src = url(d.thumb, homeUrls);
-    img.alt = '';
-    const meta = document.createElement('span');
-    meta.className = 'meta';
-    const strong = document.createElement('strong');
-    strong.textContent = d.title?.trim() || '(제목 없음)';
-    const info = document.createElement('span');
-    info.className = 'muted small';
-    const when = new Date(d.updated);
-    info.textContent = `사진 ${d.photos.length}장 · ${when.getMonth() + 1}월 ${when.getDate()}일 ${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')} 수정`;
-    meta.append(strong, info);
-    const chev = icon('chev', 'ic sm chev');
-    b.append(img, meta, chev);
-    b.addEventListener('click', () => openDraft(d.id));
-    li.append(b);
+    li.className = 'slot' + (d ? '' : ' free');
+    const card = document.createElement('button');
+    card.className = 'card';
+    if (d) {
+      const img = document.createElement('img');
+      if (d.thumb) img.src = url(d.thumb, homeUrls);
+      img.alt = '';
+      card.append(img);
+      card.setAttribute('aria-label', `${d.title?.trim() || '제목 없는 초안'} 열기`);
+      card.addEventListener('click', () => openDraft(d.id));
+      const name = document.createElement('strong');
+      name.textContent = d.title?.trim() || '제목 없음';
+      if (!d.title?.trim()) name.className = 'untitled';
+      const when = new Date(d.updated);
+      const meta = document.createElement('span');
+      meta.className = 'when';
+      meta.textContent = `사진 ${d.photos.length} · ${when.getMonth() + 1}.${when.getDate()} ${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')}`;
+      li.append(card, name, meta);
+    } else {
+      card.append(icon('plus'), document.createTextNode('New post'));
+      card.addEventListener('click', () => newDraft());
+      li.append(card);
+    }
     list.append(li);
   }
+  renderStarters(drafts.length);
+}
+
+function renderStarters(count) {
+  if (!catalog) return;
+  if (count !== undefined) renderStarters.count = count;
+  const full = (renderStarters.count ?? 0) >= store.LIMIT;
+  const used = usedPictures();
+  const comps = [...catalog.compositions].sort((a, b) => !!used[a.id] - !!used[b.id]);
+  $('used-count').textContent = `사용 ${catalog.compositions.filter(c => used[c.id]).length} / ${catalog.compositions.length}`;
+  const box = $('starters');
+  box.replaceChildren(...comps.map(c => {
+    const b = document.createElement('button');
+    if (used[c.id]) b.className = 'used';
+    b.setAttribute('aria-label', `${c.name}로 새 초안` + (used[c.id] ? ' (사용함)' : ''));
+    const img = document.createElement('img');
+    img.src = 'assets/' + c.thumb; img.alt = ''; img.loading = 'lazy';
+    b.append(img);
+    if (used[c.id]) {
+      const mark = document.createElement('span');
+      mark.className = 'used-mark';
+      mark.append(icon('check', 'ic sm'));
+      b.append(mark);
+    }
+    b.addEventListener('click', () => {
+      if (full) { toast(`초안은 ${store.LIMIT}개까지입니다. 하나를 마치거나 지운 뒤 시작해 주세요.`); return; }
+      newDraft(c.id);
+    });
+    return b;
+  }));
 }
 
 // Assets load in the background; drafts can be listed before they arrive.
@@ -130,12 +208,12 @@ async function whenReady() {
   }
 }
 
-async function newDraft() {
+async function newDraft(composition) {
   await whenReady();
   const comps = catalog.compositions;
   draft = {
     id: uid(), created: Date.now(), updated: Date.now(),
-    composition: pickPicture(comps).id,
+    composition: composition || pickPicture(comps).id,
     title: '', vertical: false, layout: 0, seed: seed(), caption: '', photos: [], thumb: null,
     captionMode: 'single', coverCaption: '',
   };
@@ -825,7 +903,6 @@ function showTab(name) {
 // ---------------------------------------------------------------- wiring
 
 function wire() {
-  $('new-draft').addEventListener('click', newDraft);
   $('back').addEventListener('click', () => goHome());
   $('title').addEventListener('input', e => { draft.title = e.target.value; syncDirection(); schedule(); });
   $('direction').addEventListener('click', e => {
@@ -978,10 +1055,14 @@ function wire() {
   fitHeight();
   window.addEventListener('resize', fitHeight);
   window.visualViewport?.addEventListener('resize', fitHeight);
+  window.addEventListener('orientationchange', () => setTimeout(fitHeight, 300));
+  window.addEventListener('pageshow', fitHeight);
+  watchBars();
+  $('screen-note').addEventListener('toggle', e => { if (e.target.open) showScreenInfo(); });
   wire();
   wireNavigation();
   ready = init();
-  ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
+  ready.then(c => { catalog = c; renderStarters(); }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   store.persist();
   renderHome();
 })();

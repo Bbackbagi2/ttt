@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=14">
 <title>TTT</title>
 </head>
 <body>
@@ -58,23 +58,37 @@
 <!-- ============================================================ home -->
 <main id="home" class="home">
   <header class="home-head">
-    <p class="eyebrow">The Thinker's Toilet</p>
-    <h1>Posts</h1>
+    <img class="home-icon" src="icon-ce8623c-180.png" alt="">
+    <div>
+      <p class="eyebrow">The Thinker's Toilet</p>
+      <h1>Posts</h1>
+    </div>
   </header>
 
-  <section>
+  <section class="home-section">
     <div class="section-head">
       <span class="label">초안</span>
       <span id="draft-count" class="count"></span>
     </div>
-    <ul id="drafts" class="drafts"></ul>
-    <p id="empty" class="empty" hidden>아직 초안이 없습니다.</p>
-    <button id="new-draft" class="btn primary wide"><svg class="ic"><use href="#i-plus"/></svg>New post</button>
+    <ol id="slots" class="slots"></ol>
+  </section>
+
+  <section class="home-section">
+    <div class="section-head">
+      <span class="label">그림으로 시작</span>
+      <span id="used-count" class="count"></span>
+    </div>
+    <div id="starters" class="starters" aria-label="Start a post from a picture"></div>
+    <p class="hint">그림을 누르면 그 그림으로 새 초안을 엽니다. 체크 표시는 이미 게시한 그림입니다.</p>
   </section>
 
   <details class="note">
     <summary>초안은 어디에 저장되나요?</summary>
     <p>초안은 최대 3개까지 <strong>이 기기의 이 브라우저에만</strong> 저장됩니다. 서버나 iCloud로 보내지 않습니다. Safari가 오래 쓰지 않은 사이트의 데이터를 지울 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관할 수 있으니 한쪽만 쓰는 것을 권합니다. 사진 원본은 사진 앱에 그대로 있습니다.</p>
+  </details>
+  <details id="screen-note" class="note">
+    <summary>화면 정보</summary>
+    <pre id="screen-info" class="screen-info"></pre>
   </details>
 </main>
 
@@ -262,6 +276,6 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
-<script type="module" src="js/app.js?v=17"></script>
+<script type="module" src="js/app.js?v=19"></script>
 </body>
 </html>
