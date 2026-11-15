@@ -1,4 +1,4 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=8';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=9';
 import * as store from './store.js?v=8';
 
 const $ = id => document.getElementById(id);
@@ -37,6 +37,26 @@ function loadBlobImage(blob) {
     img.onerror = () => { URL.revokeObjectURL(u); reject(new Error('사진을 읽지 못했습니다.')); };
     img.src = u;
   });
+}
+
+// ---------------------------------------------------------------- pictures already posted
+// Kept on this device only (localStorage): picture id -> date it was marked used.
+
+const USED_KEY = 'ttt-used';
+function usedPictures() {
+  try { return JSON.parse(localStorage.getItem(USED_KEY)) || {}; } catch (_) { return {}; }
+}
+function setUsed(id, on) {
+  const m = usedPictures();
+  if (on) m[id] = Date.now(); else delete m[id];
+  try { localStorage.setItem(USED_KEY, JSON.stringify(m)); } catch (_) { toast('이 브라우저에 저장하지 못했습니다'); }
+}
+// Unused pictures first; falls back to all of them once every picture has been used.
+function pickPicture(comps) {
+  const used = usedPictures();
+  const fresh = comps.filter(c => !used[c.id]);
+  const pool = fresh.length ? fresh : comps;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // ---------------------------------------------------------------- home
@@ -89,8 +109,9 @@ async function newDraft() {
   const comps = catalog.compositions;
   draft = {
     id: uid(), created: Date.now(), updated: Date.now(),
-    composition: comps[Math.floor(Math.random() * comps.length)].id,
+    composition: pickPicture(comps).id,
     title: '', vertical: false, layout: 0, seed: seed(), caption: '', photos: [], thumb: null,
+    captionMode: 'single', coverCaption: '',
   };
   try { await store.save(draft); } catch (e) { toast(e.message); return; }
   openEditor();
@@ -111,7 +132,6 @@ function openEditor() {
   $('editor').hidden = false;
   window.scrollTo(0, 0);
   $('title').value = draft.title;
-  $('caption').value = draft.caption;
   $('fallback').hidden = true;
   $('export-status').textContent = '';
   $('saved').textContent = '';
@@ -119,11 +139,13 @@ function openEditor() {
   future = [];
   lastCheck = { key: '', time: 0 };
   behind = { key: null, canvas: null };
+  slide = 0;
+  slideThumbs.clear();
   showTab('cover');
   syncControls();
   renderCompositions();
   renderPhotos();
-  updateCaptionCount();
+  syncCaption();
   schedule();
 }
 
@@ -177,6 +199,7 @@ function showCompName(name) {
   const item = catalog.compositions.find(c => c.id === draft.composition);
   const visible = item && (!filter || item.kind === filter);
   $('comp-name').textContent = name ?? (visible ? item.name : '');
+  $('unmark-used').hidden = !(visible && usedPictures()[item.id]);
 }
 
 function syncControls() {
@@ -213,6 +236,7 @@ async function drawCover() {
   $('title-warn').hidden = result.fits;
   if (result.mode === 'picture') showCompName();
   if (!draft.titleSize && result.titleSize) $('title-size').value = result.titleSize;
+  if (!$('post').hidden) renderPost();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(persistDraft, 500);
 }
@@ -253,14 +277,23 @@ function syncDirection() {
 function renderCompositions() {
   const grid = $('compositions');
   grid.replaceChildren();
-  for (const c of catalog.compositions) {
-    if (filter && c.kind !== filter) continue;
+  const used = usedPictures();
+  const comps = catalog.compositions.filter(c => !filter || c.kind === filter);
+  // Pictures already posted go to the end, in their usual order.
+  comps.sort((a, b) => !!used[a.id] - !!used[b.id]);
+  for (const c of comps) {
     const b = document.createElement('button');
-    b.className = c.id === draft.composition ? 'on' : '';
-    b.setAttribute('aria-label', c.name);
+    b.className = (c.id === draft.composition ? 'on' : '') + (used[c.id] ? ' used' : '');
+    b.setAttribute('aria-label', c.name + (used[c.id] ? ' (used)' : ''));
     const img = document.createElement('img');
     img.src = 'assets/' + c.thumb; img.alt = ''; img.loading = 'lazy';
     b.append(img);
+    if (used[c.id]) {
+      const mark = document.createElement('span');
+      mark.className = 'used-mark';
+      mark.append(icon('check', 'ic sm'));
+      b.append(mark);
+    }
     b.addEventListener('click', () => {
       checkpoint('composition:' + c.id);
       draft.composition = c.id;
@@ -340,11 +373,202 @@ function move(i, step) {
 
 // ---------------------------------------------------------------- caption & export
 
+// One caption for the post, or one per slide (Instagram's "Multiple captions").
+const multiple = () => draft.captionMode === 'multiple';
+const slideCount = () => 1 + draft.photos.length;
+function slideText(i) { return (i === 0 ? draft.coverCaption : draft.photos[i - 1]?.caption) || ''; }
+function setSlideText(i, text) {
+  if (i === 0) draft.coverCaption = text;
+  else if (draft.photos[i - 1]) draft.photos[i - 1].caption = text;
+}
+const currentCaption = () => multiple() ? slideText(slide) : draft.caption;
+
 function updateCaptionCount() {
-  const n = [...draft.caption].length;
+  const n = [...currentCaption()].length;
   const el = $('caption-count');
-  el.textContent = `${n.toLocaleString()} / ${CAPTION_LIMIT.toLocaleString()}`;
-  el.classList.toggle('warn', n > CAPTION_LIMIT);
+  el.textContent = multiple() ? `${slide + 1}번 슬라이드 · ${n.toLocaleString()}자` : `${n.toLocaleString()} / ${CAPTION_LIMIT.toLocaleString()}`;
+  el.classList.toggle('warn', !multiple() && n > CAPTION_LIMIT);
+}
+
+function syncCaption() {
+  const multi = multiple();
+  for (const b of $('caption-mode').querySelectorAll('button')) b.classList.toggle('on', b.dataset.c === (multi ? 'multiple' : 'single'));
+  const t = $('caption');
+  if (document.activeElement !== t || t.value !== currentCaption()) t.value = currentCaption();
+  t.placeholder = multi ? `${slide + 1}번 슬라이드 아래에 보일 캡션` : '인스타그램에 붙여넣을 캡션';
+  $('caption-hint').textContent = multi
+    ? '슬라이드마다 캡션을 따로 씁니다. 위 미리보기를 넘기면 그 장의 캡션으로 바뀝니다.'
+    : '게시물 전체에 캡션 하나를 씁니다.';
+  $('copy-caption-2-label').textContent = multi ? `Copy ${slide + 1}/${slideCount()}` : 'Copy';
+  updateCaptionCount();
+  renderPostCaption();
+}
+
+// ---------------------------------------------------------------- post preview: an Instagram-style carousel
+
+let slide = 0;
+const slideThumbs = new Map();   // photo id:fit -> small JPEG data URL, memory only
+let postToken = 0;
+
+async function photoThumb(p) {
+  const key = p.id + ':' + p.fit;
+  if (!slideThumbs.has(key)) {
+    const c = preparePhoto(await loadBlobImage(p.blob), p.fit);
+    const s = document.createElement('canvas');
+    s.width = 540; s.height = 720;
+    s.getContext('2d').drawImage(c, 0, 0, 540, 720);
+    slideThumbs.set(key, s.toDataURL('image/jpeg', .85));
+  }
+  return slideThumbs.get(key);
+}
+
+function coverThumb() {
+  const s = document.createElement('canvas');
+  s.width = 540; s.height = 720;
+  s.getContext('2d').drawImage($('cover'), 0, 0, 540, 720);
+  return s.toDataURL('image/jpeg', .85);
+}
+
+async function slideSources() {
+  return [coverThumb(), ...await Promise.all(draft.photos.map(photoThumb))];
+}
+
+async function renderPost() {
+  const token = ++postToken;
+  const sources = await slideSources();
+  if (token !== postToken || !draft) return;
+  const box = $('carousel');
+  box.replaceChildren(...sources.map((src, i) => {
+    const img = document.createElement('img');
+    img.src = src; img.alt = i ? `${i + 1}번 사진` : '표지';
+    return img;
+  }));
+  slide = Math.min(slide, sources.length - 1);
+  box.scrollLeft = slide * box.clientWidth;
+  syncSlide();
+}
+
+function syncSlide() {
+  const n = slideCount();
+  $('slide-pill').textContent = `${slide + 1}/${n}`;
+  $('slide-pill').hidden = n < 2;
+  $('slide-prev').hidden = slide === 0;
+  $('slide-next').hidden = slide >= n - 1;
+  const dots = $('dots');
+  dots.replaceChildren();
+  if (n > 1) for (let i = 0; i < n; i++) {
+    const d = document.createElement('span');
+    if (i === slide) d.className = 'on';
+    dots.append(d);
+  }
+  syncCaption();
+}
+
+function renderPostCaption() {
+  const p = $('post-caption');
+  const name = document.createElement('strong');
+  name.textContent = 'ttt';
+  const text = document.createElement('span');
+  const value = currentCaption().trim();
+  text.textContent = value || (multiple() ? '이 슬라이드의 캡션이 비어 있습니다' : '캡션이 비어 있습니다');
+  text.className = value ? '' : 'none';
+  p.replaceChildren(name, text);
+}
+
+function goSlide(step) {
+  const box = $('carousel');
+  box.scrollTo({ left: (slide + step) * box.clientWidth, behavior: 'smooth' });
+}
+
+// ---------------------------------------------------------------- full post preview (feed and profile grid)
+
+let feedSlide = 0;
+
+async function openPreview() {
+  clearTimeout(renderTimer);
+  await drawCover();
+  const sources = await slideSources();
+  const box = $('feed-carousel');
+  box.replaceChildren(...sources.map((src, i) => {
+    const img = document.createElement('img');
+    img.src = src; img.alt = i ? `${i + 1}번 사진` : '표지';
+    return img;
+  }));
+  const grid = $('grid');
+  grid.replaceChildren();
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    if (i === 0) {
+      const img = document.createElement('img');
+      img.src = sources[0]; img.alt = '이번 표지';
+      cell.append(img);
+      if (sources.length > 1) cell.append(icon('photos', 'ic sm multi'));
+    } else cell.className = 'past';
+    grid.append(cell);
+  }
+  $('sheet').hidden = false;
+  feedSlide = 0;
+  box.scrollLeft = 0;
+  showPreviewMode('feed');
+  syncFeed();
+}
+
+function showPreviewMode(v) {
+  for (const b of $('preview-mode').querySelectorAll('button')) b.classList.toggle('on', b.dataset.v === v);
+  $('feed').hidden = v !== 'feed';
+  $('grid').hidden = v !== 'grid';
+  $('preview-note').textContent = v === 'feed'
+    ? '피드에서 보일 모습입니다. 넘기면 다음 장과 그 장의 캡션이 보입니다. 실제 앱 화면과 조금 다를 수 있습니다.'
+    : '프로필 격자에서 이번 표지가 놓일 자리입니다(3:4 격자 기준). 회색 칸은 이전 게시물 자리이며, 이전 게시물은 저장하지 않습니다.';
+}
+
+function syncFeed() {
+  const n = slideCount();
+  $('feed-pill').textContent = `${feedSlide + 1}/${n}`;
+  $('feed-pill').hidden = n < 2;
+  const dots = $('feed-dots');
+  dots.replaceChildren();
+  if (n > 1) for (let i = 0; i < n; i++) {
+    const d = document.createElement('span');
+    if (i === feedSlide) d.className = 'on';
+    dots.append(d);
+  }
+  const p = $('feed-caption');
+  const name = document.createElement('strong');
+  name.textContent = 'ttt';
+  const text = (multiple() ? slideText(feedSlide) : draft.caption).trim();
+  const body = document.createElement('span');
+  body.textContent = text || '(캡션 없음)';
+  if (!text) body.className = 'none';
+  p.replaceChildren(name, body);
+  p.classList.add('clamp');
+  requestAnimationFrame(() => { $('feed-more').hidden = p.scrollHeight <= p.clientHeight + 1; });
+}
+
+async function renderCopies() {
+  const multi = multiple();
+  $('copy-caption').hidden = multi;
+  const list = $('caption-copies');
+  list.hidden = !multi;
+  if (!multi) return;
+  const sources = await slideSources();
+  list.replaceChildren();
+  sources.forEach((src, i) => {
+    const li = document.createElement('li');
+    const img = document.createElement('img');
+    img.src = src; img.alt = '';
+    const text = document.createElement('span');
+    const value = slideText(i).trim();
+    text.className = 'txt' + (value ? '' : ' none');
+    text.textContent = `${i + 1}. ` + (value ? value.split('\n')[0] : '(비어 있음)');
+    const b = document.createElement('button');
+    b.append(icon('copy'));
+    b.setAttribute('aria-label', `Copy caption ${i + 1}`);
+    b.disabled = !value;
+    b.addEventListener('click', () => copyText(slideText(i), `${i + 1}번 캡션을 복사했습니다`));
+    li.append(img, text, b);
+    list.append(li);
+  });
 }
 
 async function prepareFiles() {
@@ -395,15 +619,30 @@ async function exportImages() {
   status.textContent = '이 브라우저는 한 번에 저장을 지원하지 않습니다. 이미지를 길게 눌러 저장하세요.';
 }
 
-async function copyCaption() {
+async function copyText(text, done) {
   try {
-    await navigator.clipboard.writeText(draft.caption);
-    toast('캡션을 복사했습니다');
+    await navigator.clipboard.writeText(text);
+    toast(done);
   } catch (_) {
+    showTab('caption');
     const t = $('caption');
     t.focus(); t.select();
     toast('캡션을 선택했습니다. 복사를 눌러 주세요');
   }
+}
+const copyCaption = () => copyText(currentCaption(), multiple() ? `${slide + 1}번 캡션을 복사했습니다` : '캡션을 복사했습니다');
+
+// After posting, offer to mark the cover picture as used so it moves to the end of the list.
+async function posted() {
+  if (!confirm('게시를 마쳤나요? 이 초안을 기기에서 지웁니다.')) return;
+  const item = normalize(draft).mode === 'picture' && catalog.compositions.find(c => c.id === draft.composition);
+  if (item && !usedPictures()[item.id]
+      && confirm(`이번 표지 그림("${item.name}")을 사용한 그림으로 표시할까요?\n표시하면 그림 목록 맨 아래로 가고 체크가 붙습니다.`)) {
+    setUsed(item.id, true);
+  }
+  await store.remove(draft.id);
+  toast('초안을 지웠습니다');
+  showHome();
 }
 
 async function finish(message) {
@@ -448,6 +687,11 @@ function wireDrag() {
 function showTab(name) {
   for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === name);
   for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== name;
+  const post = name === 'caption';
+  $('cover').hidden = post;
+  $('post').hidden = !post;
+  if (post) renderPost();
+  if (name === 'export') renderCopies();
 }
 
 // ---------------------------------------------------------------- wiring
@@ -542,19 +786,52 @@ function wire() {
   $('random-all').addEventListener('click', () => {
     checkpoint('random');
     const comps = catalog.compositions.filter(c => !filter || c.kind === filter);
-    draft.composition = comps[Math.floor(Math.random() * comps.length)].id;
+    draft.composition = pickPicture(comps).id;
     draft.seed = seed();
     draft.layout = Math.floor(Math.random() * 6);
     renderCompositions(); schedule();
   });
   $('photo-input').addEventListener('change', e => { addPhotos([...e.target.files]); e.target.value = ''; });
+  $('caption-mode').addEventListener('click', e => {
+    const c = e.target.closest('button')?.dataset.c;
+    if (!c || c === (draft.captionMode || 'single')) return;
+    // Starting multiple captions with an empty set carries the single caption over to the first slide.
+    if (c === 'multiple' && !draft.coverCaption && !draft.photos.some(p => p.caption)) draft.coverCaption = draft.caption;
+    draft.captionMode = c;
+    syncCaption();
+    clearTimeout(saveTimer); saveTimer = setTimeout(persistDraft, 600);
+  });
+  $('carousel').addEventListener('scroll', e => {
+    const i = Math.round(e.target.scrollLeft / Math.max(1, e.target.clientWidth));
+    if (i !== slide && i >= 0 && i < slideCount()) { slide = i; syncSlide(); }
+  }, { passive: true });
+  $('open-preview').addEventListener('click', openPreview);
+  $('close-preview').addEventListener('click', () => { $('sheet').hidden = true; });
+  $('preview-mode').addEventListener('click', e => {
+    const v = e.target.closest('button')?.dataset.v;
+    if (v) showPreviewMode(v);
+  });
+  $('feed-carousel').addEventListener('scroll', e => {
+    const i = Math.round(e.target.scrollLeft / Math.max(1, e.target.clientWidth));
+    if (i !== feedSlide && i >= 0 && i < slideCount()) { feedSlide = i; syncFeed(); }
+  }, { passive: true });
+  $('feed-more').addEventListener('click', () => { $('feed-caption').classList.remove('clamp'); $('feed-more').hidden = true; });
+  $('slide-prev').addEventListener('click', () => goSlide(-1));
+  $('slide-next').addEventListener('click', () => goSlide(1));
   $('caption').addEventListener('input', e => {
-    draft.caption = e.target.value; updateCaptionCount();
+    if (multiple()) setSlideText(slide, e.target.value); else draft.caption = e.target.value;
+    updateCaptionCount(); renderPostCaption();
     clearTimeout(saveTimer); saveTimer = setTimeout(persistDraft, 600);
   });
   $('export').addEventListener('click', exportImages);
   $('copy-caption').addEventListener('click', copyCaption);
-  $('done').addEventListener('click', () => finish('게시를 마쳤나요? 이 초안을 기기에서 지웁니다.'));
+  $('done').addEventListener('click', posted);
+  $('unmark-used').addEventListener('click', () => {
+    const item = catalog.compositions.find(c => c.id === draft.composition);
+    if (!item || !confirm(`"${item.name}"의 사용 표시를 지울까요? 목록에서 원래 자리로 돌아갑니다.`)) return;
+    setUsed(item.id, false);
+    renderCompositions();
+  });
   $('delete').addEventListener('click', () => finish('이 초안을 삭제할까요? 되돌릴 수 없습니다.'));
 }
 

@@ -12,6 +12,7 @@ let atlas = null;           // ImageData of tiles.png
 const frames = {};          // plaque frames by "orient-length"
 const glazes = {};          // glaze filter images by orientation
 const pictures = new Map(); // composition id -> ImageData
+const steam = {};           // window condensation layers: fog (RGBA) and drops (normal + height)
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -37,6 +38,8 @@ export async function init() {
   const jobs = [
     loadImage('assets/tiles.png').then(img => { atlas = pixels(img); }),
     font.load().then(f => document.fonts.add(f)),
+    loadImage('assets/window/fog.png').then(img => { steam.fog = pixels(img); }),
+    loadImage('assets/window/drops.png').then(img => { steam.drops = pixels(img); }),
   ];
   for (let n = 1; n <= MAXLEN; n++) {
     jobs.push(loadImage(`assets/plaque/square-${n}.png`).then(img => { frames[`square-${n}`] = pixels(img); }));
@@ -245,36 +248,121 @@ function plaque(fit, colors, orient, w, h, rand) {
 // next slide (the first body photo, already fitted to 1080x1440) at the very same place,
 // so swiping from the cover to the photo continues the view.
 function windowPane(behind, x0, y0, n, frost, rand) {
-  const S = n * P;
+  const S = n * P, pad = 16, B = S + 2 * pad;
+  // The view behind, with a margin so the drops can bend in light from just outside.
+  const src = document.createElement('canvas');
+  src.width = src.height = B;
+  const sg = src.getContext('2d', { willReadFrequently: true });
+  sg.imageSmoothingQuality = 'high';
+  sg.fillStyle = '#c8d6da';
+  sg.fillRect(0, 0, B, B);
+  if (behind) sg.drawImage(behind, x0 - pad, y0 - pad, B, B, 0, 0, B, B);
+  const sharp = sg.getImageData(0, 0, B, B).data;
+  // Behind the mist the view is soft: a strong downscale and smooth upscale stands in for a blur.
+  const small = document.createElement('canvas');
+  small.width = small.height = Math.max(4, Math.round(B / 18));
+  const mg = small.getContext('2d');
+  mg.imageSmoothingQuality = 'high';
+  mg.drawImage(src, 0, 0, small.width, small.height);
+  sg.drawImage(small, 0, 0, B, B);
+  const soft = sg.getImageData(0, 0, B, B).data;
+
+  // A window-sized piece of the steamed-up glass layers, at a seeded place.
+  const T = steam.fog.width;
+  const ox = Math.floor(rand() * Math.max(1, T - S)), oy = Math.floor(rand() * Math.max(1, T - S));
+  const fog = steam.fog.data, drops = steam.drops.data;
+  const thick = clamp(frost / FROST, 0, 1.6);
+
   const pane = document.createElement('canvas');
   pane.width = pane.height = S;
   const g = pane.getContext('2d', { willReadFrequently: true });
-  g.imageSmoothingQuality = 'high';
-  if (behind) {
-    g.drawImage(behind, x0, y0, S, S, 0, 0, S, S);
-  } else {
-    g.fillStyle = '#c8d6da';
-    g.fillRect(0, 0, S, S);
+  const out = g.createImageData(S, S);
+  const o = out.data;
+  const sample = (data, x, y, ch) => {
+    x = clamp(x, 0, B - 1.001); y = clamp(y, 0, B - 1.001);
+    const ix = x | 0, iy = y | 0, fx = x - ix, fy = y - iy;
+    const a = (iy * B + ix) * 4 + ch, b = a + 4, c = a + B * 4, d = c + 4;
+    const top = data[a] + (data[b] - data[a]) * fx;
+    return top + (data[c] + (data[d] - data[c]) * fx - top) * fy;
+  };
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const k = (y * S + x) * 4;
+      const t = ((oy + y) % T * T + (ox + x) % T) * 4;
+      const cap = drops[t + 2] / 255;
+      if (cap > 0) {
+        // A drop is a small lens: it shows the view flipped and a little sharper,
+        // darkens toward its rim and carries a highlight from the upper-left light.
+        const nx = (drops[t] - 128) / 127, ny = (drops[t + 1] - 128) / 127;
+        const bend = 7 + 9 * cap;
+        const sx = x + pad - nx * bend, sy = y + pad - ny * bend;
+        const rim = .8 + .2 * Math.sqrt(cap);
+        const lit = Math.max(0, nx * .55 + ny * .8);
+        const d = Math.hypot(nx + .36, ny + .46);
+        const spec = cap > .25 ? Math.max(0, 1 - d / .24) ** 2 : 0;
+        for (let ch = 0; ch < 3; ch++) {
+          const v = sample(sharp, sx, sy, ch) * rim + 12 + 95 * lit * lit * (1 - cap) + 235 * spec;
+          o[k + ch] = v;
+        }
+      } else {
+        // Mist: the view goes soft and pale where it is thick.
+        const f = clamp(fog[t + 3] / 255 * thick, 0, 1);
+        const blur = Math.min(1, f * 1.5), white = f * .62;
+        const i = ((y + pad) * B + x + pad) * 4;
+        for (let ch = 0; ch < 3; ch++) {
+          const v = sharp[i + ch] + (soft[i + ch] - sharp[i + ch]) * blur;
+          o[k + ch] = v + (fog[t + ch] - v) * white;
+        }
+      }
+      o[k + 3] = 255;
+    }
   }
-  frost = clamp(frost, 0, 1);
-  if (frost > 0) {
-    // A strong downscale and smooth upscale stands in for a blur.
-    const small = document.createElement('canvas');
-    small.width = small.height = Math.max(4, Math.round(S / 14));
-    const sg = small.getContext('2d');
-    sg.imageSmoothingQuality = 'high';
-    sg.drawImage(pane, 0, 0, small.width, small.height);
-    g.globalAlpha = frost;
-    g.drawImage(small, 0, 0, S, S);
-    g.globalAlpha = 1;
-  }
-  g.fillStyle = `rgba(${GLASS.join(',')},${.06 + .25 * frost})`;
+  g.putImageData(out, 0, 0);
+
+  // Glass tint, thicker-looking toward the edges.
+  const tint = g.createRadialGradient(S * .45, S * .4, S * .1, S / 2, S / 2, S * .75);
+  tint.addColorStop(0, `rgba(${GLASS.join(',')},.04)`);
+  tint.addColorStop(1, `rgba(${GLASS.join(',')},.14)`);
+  g.fillStyle = tint;
   g.fillRect(0, 0, S, S);
-  // A transparent glaze from the tile photographs gives the glass its surface.
+
+  // A faint glaze surface from the tile photographs, so the pane belongs to the wall.
   const list = glazes.square;
-  g.globalAlpha = .32 + .3 * frost;
+  g.globalAlpha = .06;
   g.drawImage(list[Math.floor(rand() * list.length)], 0, 0, S, S);
   g.globalAlpha = 1;
+
+  // Reflections of the room light, which comes from the upper left like the wall light:
+  // a soft sheen in that corner and two diagonal streaks.
+  g.save();
+  g.globalCompositeOperation = 'screen';
+  const sheen = g.createLinearGradient(0, 0, S, S);
+  sheen.addColorStop(0, 'rgba(255,255,255,.12)');
+  sheen.addColorStop(.45, 'rgba(255,255,255,0)');
+  sheen.addColorStop(1, 'rgba(255,255,255,.05)');
+  g.fillStyle = sheen;
+  g.fillRect(0, 0, S, S);
+  const shift = (rand() - .5) * .08;
+  const streak = g.createLinearGradient(0, 0, S, S);
+  const stops = [[0, 0], [.2, 0], [.25, .14], [.3, .02], [.34, .08], [.37, 0], [.68, 0], [.71, .05], [.74, 0], [1, 0]];
+  for (const [t, a] of stops) streak.addColorStop(clamp(t + (t > 0 && t < 1 ? shift : 0), 0, 1), `rgba(255,255,255,${a})`);
+  g.fillStyle = streak;
+  g.fillRect(0, 0, S, S);
+  g.restore();
+
+  // Depth of the opening: the top and left inner edges sit in shadow, the bottom and right catch light.
+  const edge = Math.max(8, Math.round(S * .05));
+  const shade = (x0g, y0g, x1g, y1g, color, x, y, w, h) => {
+    const gr = g.createLinearGradient(x0g, y0g, x1g, y1g);
+    gr.addColorStop(0, color);
+    gr.addColorStop(1, color.replace(/[\d.]+\)$/, '0)'));
+    g.fillStyle = gr;
+    g.fillRect(x, y, w, h);
+  };
+  shade(0, 0, 0, edge * 1.6, 'rgba(20,28,32,.38)', 0, 0, S, edge * 1.6);
+  shade(0, 0, edge * 1.2, 0, 'rgba(20,28,32,.26)', 0, 0, edge * 1.2, S);
+  shade(0, S, 0, S - edge * .5, 'rgba(255,255,255,.3)', 0, S - edge * .5, S, edge * .5);
+  shade(S, 0, S - edge * .5, 0, 'rgba(255,255,255,.22)', S - edge * .5, 0, edge * .5, S);
   return g.getImageData(0, 0, S, S);
 }
 

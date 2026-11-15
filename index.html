@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=9">
 <title>TTT</title>
 </head>
 <body>
@@ -48,6 +48,11 @@
   <symbol id="i-picture" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15c2-4 6-4 8 0"/><circle cx="12" cy="9" r="1.2"/></symbol>
   <symbol id="i-window" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1" class="soft"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-11.6 7.1L4 20l1.4-4.2A8 8 0 1 1 20 11.5z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 4L3 10.5l7 3 3 7L21 4z"/><path d="M10 13.5L21 4"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4.5L6 20z"/></symbol>
 </svg>
 
 <!-- ============================================================ home -->
@@ -78,14 +83,28 @@
   <header class="bar">
     <button id="back" class="icon-btn" aria-label="Back to drafts"><svg class="ic"><use href="#i-back"/></svg></button>
     <span id="saved" class="saved"></span>
+    <div class="bar-end">
+    <button id="open-preview" class="icon-btn" aria-label="Preview post" title="Preview post"><svg class="ic"><use href="#i-eye"/></svg></button>
     <div class="history" role="group" aria-label="History">
       <button id="undo" class="icon-btn" aria-label="Undo" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
       <button id="redo" class="icon-btn" aria-label="Redo" disabled><svg class="ic"><use href="#i-redo"/></svg></button>
+    </div>
     </div>
   </header>
 
   <div class="stage">
     <canvas id="cover" class="preview" width="1080" height="1440" aria-label="Cover preview"></canvas>
+    <div id="post" class="post" hidden>
+      <div class="post-head"><span class="avatar">T</span><strong>ttt</strong></div>
+      <div class="carousel-wrap">
+        <div id="carousel" class="carousel" aria-label="Slides"></div>
+        <span id="slide-pill" class="pill"></span>
+        <button id="slide-prev" class="nav prev" aria-label="Previous slide"><svg class="ic sm"><use href="#i-chev"/></svg></button>
+        <button id="slide-next" class="nav next" aria-label="Next slide"><svg class="ic sm"><use href="#i-chev"/></svg></button>
+      </div>
+      <div id="dots" class="dots"></div>
+      <p id="post-caption" class="post-caption"></p>
+    </div>
   </div>
 
   <div class="panels">
@@ -114,7 +133,7 @@
       <div id="picture-panel" class="group">
         <div class="group-head">
           <span class="label">그림</span>
-          <span id="comp-name" class="hint"></span>
+          <span class="comp-meta"><span id="comp-name" class="hint"></span><button id="unmark-used" class="tag" hidden>Used · Unmark</button></span>
         </div>
         <div id="filters" class="chips">
           <button data-k="" class="on">All</button>
@@ -173,10 +192,14 @@
 
     <!-- caption -->
     <section data-panel="caption" class="panel" hidden>
-      <textarea id="caption" rows="8" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
+      <div id="caption-mode" class="segmented">
+        <button data-c="single" class="on">Single caption</button><button data-c="multiple">Multiple captions</button>
+      </div>
+      <p id="caption-hint" class="hint"></p>
+      <textarea id="caption" rows="6" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
       <div class="row">
         <span id="caption-count" class="hint">0 / 2,200</span>
-        <button id="copy-caption-2" class="btn"><svg class="ic sm"><use href="#i-copy"/></svg>Copy</button>
+        <button id="copy-caption-2" class="btn"><svg class="ic sm"><use href="#i-copy"/></svg><span id="copy-caption-2-label">Copy</span></button>
       </div>
     </section>
 
@@ -187,6 +210,7 @@
         <p id="export-status" class="hint"></p>
         <div id="fallback" class="fallback" hidden></div>
         <button id="copy-caption" class="btn wide"><svg class="ic"><use href="#i-copy"/></svg>Copy caption</button>
+        <ol id="caption-copies" class="copies" hidden></ol>
         <button id="done" class="btn wide"><svg class="ic"><use href="#i-check"/></svg>Mark as posted</button>
       </div>
       <button id="delete" class="btn quiet wide"><svg class="ic sm"><use href="#i-trash"/></svg>Delete draft</button>
@@ -202,7 +226,36 @@
   </nav>
 </main>
 
+<!-- ============================================================ post preview -->
+<div id="sheet" class="sheet" hidden role="dialog" aria-label="Post preview">
+  <header class="sheet-bar">
+    <button id="close-preview" class="icon-btn" aria-label="Close preview"><svg class="ic"><use href="#i-close"/></svg></button>
+    <div id="preview-mode" class="segmented compact">
+      <button data-v="feed" class="on">Feed</button><button data-v="grid">Grid</button>
+    </div>
+    <span class="icon-btn" aria-hidden="true"></span>
+  </header>
+  <div class="sheet-body">
+    <article id="feed" class="feed">
+      <div class="post-head"><span class="avatar">T</span><strong>ttt</strong></div>
+      <div class="carousel-wrap">
+        <div id="feed-carousel" class="carousel" aria-label="Slides"></div>
+        <span id="feed-pill" class="pill"></span>
+      </div>
+      <div class="feed-actions">
+        <span class="feed-icons"><svg class="ic"><use href="#i-heart"/></svg><svg class="ic"><use href="#i-comment"/></svg><svg class="ic"><use href="#i-send"/></svg></span>
+        <span id="feed-dots" class="dots"></span>
+        <span class="feed-icons end"><svg class="ic"><use href="#i-bookmark"/></svg></span>
+      </div>
+      <p id="feed-caption" class="feed-caption clamp"></p>
+      <button id="feed-more" class="feed-more" hidden>더 보기</button>
+    </article>
+    <div id="grid" class="profile-grid" hidden></div>
+    <p id="preview-note" class="hint sheet-note"></p>
+  </div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
-<script type="module" src="js/app.js?v=8"></script>
+<script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>
