@@ -309,7 +309,7 @@ textarea { resize: none; min-height: 170px; line-height: 1.55; }
 .slot .when { font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 
 /* while typing: the tab bar steps aside so it never rides on the keyboard */
-body.typing .editor > .tabbar { display: none; }
+body.typing .editor > .tabbar, body.typing .editor > .nav-alt { display: none; }
 body.typing .editor { padding-bottom: 0; }
 .field-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 .field-btn { width: 44px; height: 44px; background: var(--raised); border-radius: var(--r); }
@@ -424,3 +424,45 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 body.beginner .steps.guide { display: grid; }
 .steps li::marker { color: var(--faint); font-variant-numeric: tabular-nums; }
 .toast { text-align: center; line-height: 1.45; }
+
+/* ------------------------------------------------------------ menu style prototypes (dev) */
+.dev-nav { margin-top: 10px; }
+.dev-nav .list-row { flex-wrap: wrap; padding: 10px 16px; }
+body[data-nav=arc] .editor > .tabbar, body[data-nav=knob] .editor > .tabbar { display: none; }
+.editor > .nav-alt {
+  position: fixed; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; z-index: 3;
+  background: var(--bg); border-top: 1px solid var(--line); touch-action: none; user-select: none; -webkit-user-select: none;
+  padding-bottom: max(6px, calc(var(--safe-bottom, env(safe-area-inset-bottom)) - 16px));
+}
+/* A: arc dial */
+.arc { height: calc(108px + max(6px, calc(var(--safe-bottom, env(safe-area-inset-bottom)) - 16px))); overflow: hidden; }
+/* The wheel's centre sits 300 px below the rim, so only the top of the dial shows. */
+.arc-wheel { position: absolute; left: 50%; top: 346px; width: 0; height: 0; }
+.arc-rim { position: absolute; left: -300px; top: -300px; width: 600px; height: 600px; border-radius: 50%;
+  border: 1px solid var(--control-on); background: radial-gradient(circle at 50% 0, var(--raised), var(--bg) 40%); }
+.arc-item {
+  position: absolute; left: -23px; top: -23px; width: 46px; height: 46px; border: 0; border-radius: 50%;
+  display: grid; place-items: center; background: var(--control); color: var(--muted);
+  transition: background .2s, color .2s;
+}
+.arc-item.on { background: var(--primary-fill); color: #e8f0f4; }
+.arc-tick { position: absolute; left: -1px; top: -1px; width: 2px; height: 8px; background: var(--faint); border-radius: 1px; }
+.arc-caret { position: absolute; left: 50%; top: 0; width: 0; height: 0; margin-left: -6px;
+  border: 6px solid transparent; border-top-color: var(--primary); }
+.arc-label { position: absolute; left: 0; right: 0; top: 78px; text-align: center; font-size: 12px; color: var(--ink); letter-spacing: .02em; }
+/* B: knob */
+.knobnav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-left: 28px; padding-right: 28px; padding-top: 10px; min-height: 92px; }
+.knob-info { display: grid; gap: 6px; }
+.knob-label { font-size: 17px; font-weight: 600; }
+.knob-dots { display: flex; gap: 6px; }
+.knob-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--control-on); }
+.knob-dots i.on { background: var(--primary); }
+.knob {
+  position: relative; width: 72px; height: 72px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #3a3e42, #1d1f21 70%); box-shadow: 0 6px 16px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.knob::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; border: 1px dashed var(--control-on); }
+.knob-mark { position: absolute; left: 50%; top: 7px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: var(--primary); }
+/* C: the bar curves like a wheel rim while dragged */
+.tabbar.curving button { transition: none; }
+.tabbar button.settle { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }

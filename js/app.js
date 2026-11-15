@@ -80,11 +80,13 @@ function watchBars() {
   const root = document.documentElement.style;
   const ro = new ResizeObserver(() => {
     root.setProperty('--bar-h', $('editor').querySelector('.bar').offsetHeight + 'px');
-    root.setProperty('--tab-h', $('tabs').offsetHeight + 'px');
+    updateTabH();
     springPill(tabIndex(currentTab), true);
   });
   ro.observe($('editor').querySelector('.bar'));
   ro.observe($('tabs'));
+  ro.observe($('nav-arc'));
+  ro.observe($('nav-knob'));
 }
 
 // A short message; with an action (like Undo) it stays a little longer and offers a button.
@@ -301,6 +303,8 @@ function renderSettings() {
   $('opt-beginner').checked = settings.beginner;
   $('opt-dev').checked = settings.dev;
   $('dev-info').hidden = !settings.dev;
+  $('dev-nav').hidden = !settings.dev;
+  for (const b of $('nav-style').querySelectorAll('button')) b.classList.toggle('on', b.dataset.n === navStyle());
   liveDevInfo(settings.dev);
   $('faq').replaceChildren(...FAQ.map(([q, a]) => {
     const d = document.createElement('details');
@@ -416,7 +420,18 @@ function wireSettings() {
     settings.dev = e.target.checked;
     saveSettings();
     $('dev-info').hidden = !settings.dev;
+    $('dev-nav').hidden = !settings.dev;
     liveDevInfo(settings.dev);
+    applyNav();
+  });
+  $('nav-style').addEventListener('click', e => {
+    const n = e.target.closest('button')?.dataset.n;
+    if (!n) return;
+    settings.nav = n;
+    saveSettings();
+    for (const b of $('nav-style').querySelectorAll('button')) b.classList.toggle('on', b.dataset.n === n);
+    applyNav();
+    toast(`메뉴 스타일: ${n}`);
   });
 }
 
@@ -551,6 +566,7 @@ function enterEditor() {
   $('editor').querySelector('.panels').scrollTop = 0;
   ed.getBoundingClientRect();           // start the slide from off screen
   springPill(tabIndex(currentTab), true);
+  applyNav();
   document.body.classList.add('editing');
   $('home').inert = true;
   if (!window.history.state?.editor) pushNav({ editor: true });
@@ -1297,6 +1313,7 @@ function wireTabSlider() {
     pill.x = Math.min(items.at(-1).x, Math.max(items[0].x, centre - near.w / 2));
     pill.w = pill.tw = near.w;
     paintPill();
+    curveBar(true);
     if (near.i !== drag.i) {
       drag.i = near.i;
       drag.moved = true;
@@ -1309,6 +1326,7 @@ function wireTabSlider() {
     const was = drag.on, moved = drag.moved;
     drag = null;
     if (was) {
+      curveBar(false);
       pill.v = 0;
       springPill(tabIndex(currentTab));
       if (moved) tick();          // the lift is a user action, so iOS plays this one
@@ -1316,6 +1334,230 @@ function wireTabSlider() {
   };
   bar.addEventListener('pointerup', end);
   bar.addEventListener('pointercancel', end);
+}
+
+// ---------------------------------------------------------------- menu style prototypes
+// Developer mode can swap the tab bar for one of three trials: Arc (a camera-style dial),
+// Knob (a round knob turned by circling it) and Curve (the bar bends like a wheel rim while
+// dragged). Bar is the normal tab bar.
+
+const navStyle = () => (settings.dev ? settings.nav || 'bar' : 'bar');
+const tabLabel = b => [...b.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+let navDriving = false;   // a dial or knob is switching tabs itself
+
+function updateTabH() {
+  const n = navStyle();
+  const el = n === 'arc' ? $('nav-arc') : n === 'knob' ? $('nav-knob') : $('tabs');
+  document.documentElement.style.setProperty('--tab-h', el.offsetHeight + 'px');
+}
+
+function applyNav() {
+  const n = navStyle();
+  document.body.dataset.nav = n;
+  $('nav-arc').hidden = n !== 'arc';
+  $('nav-knob').hidden = n !== 'knob';
+  updateTabH();
+  syncNav(tabIndex(currentTab), true);
+}
+
+function syncNav(i, instant = false) {
+  if (navDriving) return;
+  arcTo(i, instant);
+  knobTo(i, instant);
+}
+
+// A spring that moves `state.pos` toward `state.target` and repaints each frame.
+function springTo(state, paint, k = 170, c = 24) {
+  cancelAnimationFrame(state.raf);
+  const step = () => {
+    const dt = 1 / 60;
+    state.v += (k * (state.target - state.pos) - c * state.v) * dt;
+    state.pos += state.v * dt;
+    if (Math.abs(state.target - state.pos) < .002 && Math.abs(state.v) < .02) {
+      state.pos = state.target; state.v = 0; state.raf = 0; paint(); return;
+    }
+    paint();
+    state.raf = requestAnimationFrame(step);
+  };
+  state.raf = requestAnimationFrame(step);
+}
+
+// Past the first or last tab the dial gives way only a little, like a rubber band.
+function rubber(pos, n) {
+  if (pos < 0) return pos * .3;
+  if (pos > n - 1) return n - 1 + (pos - (n - 1)) * .3;
+  return pos;
+}
+
+// Switches tab while a dial is being turned, once per tab crossed.
+function driveTo(i) {
+  const name = tabButtons()[i]?.dataset.tab;
+  if (!name || name === currentTab) return;
+  navDriving = true;
+  showTab(name);
+  navDriving = false;
+}
+
+// ---- A: arc dial
+const ARC = { R: 300, STEP: 17, PX: 64 };
+const arc = { pos: 0, v: 0, target: 0, raf: 0, items: [], ticks: [] };
+
+function buildArc() {
+  const wheel = $('nav-arc').querySelector('.arc-wheel');
+  for (let k = -16; k <= 24; k++) {
+    const t = document.createElement('span');
+    t.className = 'arc-tick';
+    t.dataset.k = k;
+    wheel.append(t);
+    arc.ticks.push(t);
+  }
+  arc.items = tabButtons().map((b, i) => {
+    const it = document.createElement('button');
+    it.className = 'arc-item';
+    it.dataset.i = i;
+    it.setAttribute('aria-label', tabLabel(b));
+    it.append(b.querySelector('svg').cloneNode(true));
+    wheel.append(it);
+    return it;
+  });
+}
+
+function paintArc() {
+  const on = Math.round(Math.min(arc.items.length - 1, Math.max(0, arc.pos)));
+  arc.items.forEach((it, i) => {
+    const a = (i - arc.pos) * ARC.STEP;
+    it.style.transform = `rotate(${a}deg) translateY(${-ARC.R}px) rotate(${-a}deg)`;
+    it.style.opacity = String(Math.max(0, 1 - Math.abs(a) / 75));
+    it.classList.toggle('on', i === on);
+  });
+  arc.ticks.forEach(t => {
+    const a = (t.dataset.k / 2 - arc.pos) * ARC.STEP;
+    t.style.transform = `rotate(${a}deg) translateY(${-ARC.R - 34}px)`;
+    t.style.opacity = String(Math.max(0, 1 - Math.abs(a) / 60) * (t.dataset.k % 2 ? .45 : 1));
+  });
+  $('arc-label').textContent = tabLabel(tabButtons()[on]);
+}
+
+function arcTo(i, instant) {
+  arc.target = i;
+  if (instant) { cancelAnimationFrame(arc.raf); arc.pos = i; arc.v = 0; paintArc(); }
+  else springTo(arc, paintArc);
+}
+
+function wireArc() {
+  const el = $('nav-arc');
+  let d = null;
+  el.addEventListener('pointerdown', e => {
+    cancelAnimationFrame(arc.raf);
+    d = { x0: e.clientX, x: e.clientX, t: performance.now(), pos0: arc.pos, v: 0, on: false, id: e.pointerId };
+    try { el.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
+  });
+  el.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    const now = performance.now();
+    if (!d.on && Math.abs(e.clientX - d.x0) < 6) return;
+    d.on = true;
+    d.v = -(e.clientX - d.x) / ARC.PX / Math.max(.008, (now - d.t) / 1000);
+    d.x = e.clientX; d.t = now;
+    arc.pos = rubber(d.pos0 - (e.clientX - d.x0) / ARC.PX, arc.items.length);
+    paintArc();
+    driveTo(Math.round(Math.min(arc.items.length - 1, Math.max(0, arc.pos))));
+  });
+  const end = e => {
+    if (!d || e.pointerId !== d.id) return;
+    let target;
+    if (!d.on) {
+      const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('.arc-item');
+      target = hit ? +hit.dataset.i : Math.round(arc.pos);
+    } else {
+      // A flick keeps the dial spinning a little before it settles on a tab.
+      target = Math.round(arc.pos + Math.max(-2, Math.min(2, d.v * .18)));
+    }
+    target = Math.max(0, Math.min(arc.items.length - 1, target));
+    d = null;
+    tick();
+    arc.v = 0;
+    arc.target = target;
+    springTo(arc, paintArc);
+    driveTo(target);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+
+// ---- B: knob
+const KNOB_STEP = 72;   // degrees per tab
+const knob = { pos: 0, v: 0, target: 0, raf: 0 };
+
+function paintKnob() {
+  const n = tabButtons().length, on = Math.round(Math.min(n - 1, Math.max(0, knob.pos)));
+  $('knob').style.transform = `rotate(${knob.pos * KNOB_STEP}deg)`;
+  $('knob-label').textContent = tabLabel(tabButtons()[on]);
+  [...$('knob-dots').children].forEach((dot, i) => dot.classList.toggle('on', i === on));
+}
+
+function knobTo(i, instant) {
+  knob.target = i;
+  if (instant) { cancelAnimationFrame(knob.raf); knob.pos = i; knob.v = 0; paintKnob(); }
+  else springTo(knob, paintKnob, 220, 26);
+}
+
+function wireKnob() {
+  $('knob-dots').replaceChildren(...tabButtons().map(() => document.createElement('i')));
+  const el = $('knob');
+  let d = null;
+  const angle = e => {
+    const r = el.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
+  };
+  el.addEventListener('pointerdown', e => {
+    cancelAnimationFrame(knob.raf);
+    d = { a: angle(e), turned: 0, pos0: knob.pos, id: e.pointerId };
+    try { el.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
+  });
+  el.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    const a = angle(e);
+    let delta = a - d.a;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    d.a = a;
+    d.turned += delta;
+    knob.pos = rubber(d.pos0 + d.turned / KNOB_STEP, tabButtons().length);
+    paintKnob();
+    driveTo(Math.round(Math.min(tabButtons().length - 1, Math.max(0, knob.pos))));
+  });
+  const end = e => {
+    if (!d || e.pointerId !== d.id) return;
+    const n = tabButtons().length;
+    // A tap (no real turn) steps to the next tab and wraps around.
+    const target = Math.abs(d.turned) < 10 ? (Math.round(d.pos0) + 1) % n : Math.max(0, Math.min(n - 1, Math.round(knob.pos)));
+    d = null;
+    tick();
+    knob.target = target;
+    springTo(knob, paintKnob, 220, 26);
+    driveTo(target);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+
+// ---- C: the bar bends like the rim of a wheel around the finger while dragged
+function curveBar(on) {
+  const bar = $('tabs');
+  if (navStyle() !== 'curve') return;
+  if (!on) {
+    bar.classList.remove('curving');
+    tabButtons().forEach(b => { b.classList.add('settle'); b.style.transform = ''; });
+    setTimeout(() => tabButtons().forEach(b => b.classList.remove('settle')), 500);
+    return;
+  }
+  bar.classList.add('curving');
+  const centre = pill.x + pill.w / 2, w = bar.clientWidth;
+  tabButtons().forEach(b => {
+    const d = (b.offsetLeft + b.offsetWidth / 2 - centre) / w;
+    b.style.transform = `translateY(${d * d * 70}px) rotate(${d * 30}deg)`;
+  });
 }
 
 function showTab(name, { glide = true } = {}) {
@@ -1333,6 +1575,7 @@ function showTab(name, { glide = true } = {}) {
     }
   }
   if (glide) springPill(to);
+  syncNav(to);
   const post = name === 'caption';
   $('cover').hidden = post;
   $('post').hidden = !post;
@@ -1428,6 +1671,10 @@ function wire() {
     showTab(b.dataset.tab);
   });
   wireTabSlider();
+  buildArc();
+  wireArc();
+  wireKnob();
+  applyNav();
   $('copy-caption-2').addEventListener('click', copyCaption);
   $('paste-caption').addEventListener('click', () => pasteInto($('caption')));
   $('paste-title').addEventListener('click', () => pasteInto($('title')));
