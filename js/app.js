@@ -1382,12 +1382,10 @@ function springTo(state, paint, k = 170, c = 24) {
   state.raf = requestAnimationFrame(step);
 }
 
-// Past the first or last tab the dial gives way only a little, like a rubber band.
-function rubber(pos, n) {
-  if (pos < 0) return pos * .3;
-  if (pos > n - 1) return n - 1 + (pos - (n - 1)) * .3;
-  return pos;
-}
+// The dial and knob go round without end: after the last tab comes the first again. Their
+// position is an unbounded number of tabs; these map it back to a tab and find the shortest turn.
+const wrap = (i, n) => ((i % n) + n) % n;
+const nearest = (pos, i, n) => pos + (wrap(i - pos + n / 2, n) - n / 2);
 
 // Switches tab while a dial is being turned, once per tab crossed.
 function driveTo(i) {
@@ -1404,7 +1402,7 @@ const arc = { pos: 0, v: 0, target: 0, raf: 0, items: [], ticks: [] };
 
 function buildArc() {
   const wheel = $('nav-arc').querySelector('.arc-wheel');
-  for (let k = -16; k <= 24; k++) {
+  for (let k = -12; k <= 12; k++) {
     const t = document.createElement('span');
     t.className = 'arc-tick';
     t.dataset.k = k;
@@ -1428,23 +1426,26 @@ function buildArc() {
 }
 
 function paintArc() {
-  const on = Math.round(Math.min(arc.items.length - 1, Math.max(0, arc.pos)));
+  const n = arc.items.length, on = wrap(Math.round(arc.pos), n);
   arc.items.forEach((it, i) => {
-    const a = (i - arc.pos) * ARC.STEP;
+    // Each stop sits at its closest place around the wheel, so all five show at once and the
+    // one leaving one side comes back in on the other.
+    const a = (nearest(arc.pos, i, n) - arc.pos) * ARC.STEP;
     it.style.transform = `rotate(${a}deg) translateY(${-ARC.R}px) rotate(${-a}deg)`;
-    it.style.opacity = String(Math.max(0, 1 - Math.abs(a) / 75));
+    it.style.opacity = String(Math.max(0, Math.min(1, (2.5 * ARC.STEP - Math.abs(a)) / (.5 * ARC.STEP), 1 - Math.abs(a) / 90)));
     it.classList.toggle('on', i === on);
   });
+  const half = Math.floor(arc.pos * 2), frac = arc.pos * 2 - half;   // ticks every half tab
   arc.ticks.forEach(t => {
-    const a = (t.dataset.k / 2 - arc.pos) * ARC.STEP;
+    const k = +t.dataset.k, a = ((k - frac) / 2) * ARC.STEP;
     t.style.transform = `rotate(${a}deg) translateY(${-ARC.R - 34}px)`;
-    t.style.opacity = String(Math.max(0, 1 - Math.abs(a) / 60) * (t.dataset.k % 2 ? .45 : 1));
+    t.style.opacity = String(Math.max(0, 1 - Math.abs(a) / 60) * (wrap(k + half, 2) ? .45 : 1));
   });
 }
 
 function arcTo(i, instant) {
-  arc.target = i;
-  if (instant) { cancelAnimationFrame(arc.raf); arc.pos = i; arc.v = 0; paintArc(); }
+  arc.target = nearest(arc.pos, i, arc.items.length);
+  if (instant) { cancelAnimationFrame(arc.raf); arc.pos = arc.target; arc.v = 0; paintArc(); }
   else springTo(arc, paintArc);
 }
 
@@ -1463,27 +1464,26 @@ function wireArc() {
     d.on = true;
     d.v = -(e.clientX - d.x) / ARC.PX / Math.max(.008, (now - d.t) / 1000);
     d.x = e.clientX; d.t = now;
-    arc.pos = rubber(d.pos0 - (e.clientX - d.x0) / ARC.PX, arc.items.length);
+    arc.pos = d.pos0 - (e.clientX - d.x0) / ARC.PX;
     paintArc();
-    driveTo(Math.round(Math.min(arc.items.length - 1, Math.max(0, arc.pos))));
+    driveTo(wrap(Math.round(arc.pos), arc.items.length));
   });
   const end = e => {
     if (!d || e.pointerId !== d.id) return;
     let target;
     if (!d.on) {
       const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('.arc-item');
-      target = hit ? +hit.dataset.i : Math.round(arc.pos);
+      target = hit ? nearest(arc.pos, +hit.dataset.i, arc.items.length) : Math.round(arc.pos);
     } else {
       // A flick keeps the dial spinning a little before it settles on a tab.
-      target = Math.round(arc.pos + Math.max(-2, Math.min(2, d.v * .18)));
+      target = Math.round(arc.pos + Math.max(-3, Math.min(3, d.v * .18)));
     }
-    target = Math.max(0, Math.min(arc.items.length - 1, target));
     d = null;
     tick();
     arc.v = 0;
     arc.target = target;
     springTo(arc, paintArc);
-    driveTo(target);
+    driveTo(wrap(target, arc.items.length));
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
@@ -1494,14 +1494,14 @@ const KNOB_STEP = 72;   // degrees per tab
 const knob = { pos: 0, v: 0, target: 0, raf: 0 };
 
 function paintKnob() {
-  const n = tabButtons().length, on = Math.round(Math.min(n - 1, Math.max(0, knob.pos)));
+  const n = tabButtons().length, on = wrap(Math.round(knob.pos), n);
   $('knob').style.transform = `rotate(${knob.pos * KNOB_STEP}deg)`;
   [...$('knob-tabs').children].forEach((b, i) => b.classList.toggle('on', i === on));
 }
 
 function knobTo(i, instant) {
-  knob.target = i;
-  if (instant) { cancelAnimationFrame(knob.raf); knob.pos = i; knob.v = 0; paintKnob(); }
+  knob.target = nearest(knob.pos, i, tabButtons().length);
+  if (instant) { cancelAnimationFrame(knob.raf); knob.pos = knob.target; knob.v = 0; paintKnob(); }
   else springTo(knob, paintKnob, 220, 26);
 }
 
@@ -1532,20 +1532,20 @@ function wireKnob() {
     if (delta < -180) delta += 360;
     d.a = a;
     d.turned += delta;
-    knob.pos = rubber(d.pos0 + d.turned / KNOB_STEP, tabButtons().length);
+    knob.pos = d.pos0 + d.turned / KNOB_STEP;
     paintKnob();
-    driveTo(Math.round(Math.min(tabButtons().length - 1, Math.max(0, knob.pos))));
+    driveTo(wrap(Math.round(knob.pos), tabButtons().length));
   });
   const end = e => {
     if (!d || e.pointerId !== d.id) return;
     const n = tabButtons().length;
-    // A tap (no real turn) steps to the next tab and wraps around.
-    const target = Math.abs(d.turned) < 10 ? (Math.round(d.pos0) + 1) % n : Math.max(0, Math.min(n - 1, Math.round(knob.pos)));
+    // A tap (no real turn) steps to the next tab; one full turn goes through all five.
+    const target = Math.abs(d.turned) < 10 ? Math.round(d.pos0) + 1 : Math.round(knob.pos);
     d = null;
     tick();
     knob.target = target;
     springTo(knob, paintKnob, 220, 26);
-    driveTo(target);
+    driveTo(wrap(target, n));
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
