@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 <title>TTT</title>
 </head>
 <body>
@@ -245,6 +245,7 @@
   </div>
 
   <nav id="tabs" class="tabbar" role="tablist">
+    <span id="tab-pill" class="tab-pill" aria-hidden="true"></span>
     <button data-tab="cover" class="on" role="tab"><svg class="ic"><use href="#i-cover"/></svg>Cover</button>
     <button data-tab="title" role="tab"><svg class="ic"><use href="#i-title"/></svg>Title</button>
     <button data-tab="photos" role="tab"><svg class="ic"><use href="#i-photos"/></svg>Photos<span id="photo-count" class="badge"></span></button>
@@ -283,6 +284,7 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
-<script type="module" src="js/app.js?v=22"></script>
+<label id="haptic" class="haptic" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
+<script type="module" src="js/app.js?v=23"></script>
 </body>
 </html>

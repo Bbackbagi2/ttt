@@ -330,3 +330,19 @@ body.typing .editor { padding-bottom: 0; }
 .field-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 .field-btn { width: 44px; height: 44px; background: var(--raised); border-radius: var(--r); }
 .btn-pair { display: flex; gap: 8px; }
+
+/* ------------------------------------------------------------ tab slider */
+.tabbar { touch-action: none; user-select: none; -webkit-user-select: none; }
+.tab-pill {
+  position: absolute; top: 4px; left: 0; height: 52px; width: 0; border-radius: 16px;
+  background: var(--control); pointer-events: none; will-change: transform, width;
+}
+.tabbar button { z-index: 1; }
+.tabbar button .ic { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }
+.tabbar button.on .ic { transform: translateY(-1px) scale(1.12); }
+.panel.from-right { animation: panel-from-right .34s cubic-bezier(.22, 1, .36, 1); }
+.panel.from-left { animation: panel-from-left .34s cubic-bezier(.22, 1, .36, 1); }
+@keyframes panel-from-right { from { transform: translateX(26px); opacity: 0; } }
+@keyframes panel-from-left { from { transform: translateX(-26px); opacity: 0; } }
+/* the hidden switch that plays the iOS haptic tick */
+.haptic { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }

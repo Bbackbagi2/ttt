@@ -80,6 +80,7 @@ function watchBars() {
   const ro = new ResizeObserver(() => {
     root.setProperty('--bar-h', $('editor').querySelector('.bar').offsetHeight + 'px');
     root.setProperty('--tab-h', $('tabs').offsetHeight + 'px');
+    springPill(tabIndex(currentTab), true);
   });
   ro.observe($('editor').querySelector('.bar'));
   ro.observe($('tabs'));
@@ -273,6 +274,7 @@ function enterEditor() {
   ed.hidden = false;
   $('editor').querySelector('.panels').scrollTop = 0;
   ed.getBoundingClientRect();           // start the slide from off screen
+  springPill(tabIndex(currentTab), true);
   document.body.classList.add('editing');
   $('home').inert = true;
   if (!window.history.state?.editor) window.history.pushState({ editor: true }, '');
@@ -917,9 +919,110 @@ function wireDrag() {
   canvas.addEventListener('pointercancel', end);
 }
 
-function showTab(name) {
+// ---------------------------------------------------------------- tab slider
+// The tab bar is a slider: a pill glides between the tabs on a spring, and a finger dragged
+// across the bar pulls the pill like a magnet toward the nearest tab, ticking (iOS haptic) and
+// switching as it crosses from one tab to the next.
+
+const tabButtons = () => [...$('tabs').querySelectorAll('button')];
+const tabIndex = name => tabButtons().findIndex(b => b.dataset.tab === name);
+const stillMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+let currentTab = 'cover';
+const pill = { x: 0, v: 0, w: 0, target: 0, tw: 0, raf: 0 };
+
+function paintPill() {
+  const el = $('tab-pill');
+  const stretch = Math.min(18, Math.abs(pill.v) * .012);    // a little longer while it flies
+  el.style.width = (pill.w + stretch) + 'px';
+  el.style.transform = `translateX(${pill.x - (pill.v > 0 ? stretch : 0)}px)`;
+}
+
+function stepPill() {
+  const dt = 1 / 60, k = 520, c = 31;                       // spring stiffness and damping
+  pill.v += (k * (pill.target - pill.x) - c * pill.v) * dt;
+  pill.x += pill.v * dt;
+  pill.w += (pill.tw - pill.w) * .3;
+  if (Math.abs(pill.target - pill.x) < .3 && Math.abs(pill.v) < 4) {
+    Object.assign(pill, { x: pill.target, v: 0, w: pill.tw, raf: 0 });
+    paintPill();
+    return;
+  }
+  paintPill();
+  pill.raf = requestAnimationFrame(stepPill);
+}
+
+function springPill(i, instant = false) {
+  const b = tabButtons()[i];
+  if (!b || !b.offsetWidth) return;
+  pill.target = b.offsetLeft; pill.tw = b.offsetWidth;
+  if (instant || stillMotion() || !pill.w) {
+    cancelAnimationFrame(pill.raf);
+    Object.assign(pill, { x: pill.target, v: 0, w: pill.tw, raf: 0 });
+    paintPill();
+  } else if (!pill.raf) pill.raf = requestAnimationFrame(stepPill);
+}
+
+// iOS gives Safari no vibration API, but toggling a native switch control plays the system
+// haptic tick (iOS 18 and later). A hidden one is clicked on each snap.
+function tick() {
+  try { $('haptic').click(); } catch (_) { /* no haptics here */ }
+}
+
+function wireTabSlider() {
+  const bar = $('tabs');
+  let drag = null;
+  bar.addEventListener('pointerdown', e => {
+    drag = { x0: e.clientX, on: false, i: tabIndex(currentTab), id: e.pointerId };
+  });
+  bar.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.on) {
+      if (Math.abs(e.clientX - drag.x0) < 8) return;
+      drag.on = true;
+      try { bar.setPointerCapture(e.pointerId); } catch (_) { /* synthetic pointer */ }
+      cancelAnimationFrame(pill.raf); pill.raf = 0;
+    }
+    const fx = e.clientX - bar.getBoundingClientRect().left;
+    const items = tabButtons().map((b, i) => ({ i, x: b.offsetLeft, w: b.offsetWidth, c: b.offsetLeft + b.offsetWidth / 2 }));
+    const near = items.reduce((a, b) => (Math.abs(b.c - fx) < Math.abs(a.c - fx) ? b : a));
+    // Magnet: the closer the finger is to a tab's centre, the harder the pill is pulled onto it.
+    const d = fx - near.c, pull = Math.exp(-(d * d) / (2 * (near.w * .3) ** 2));
+    const centre = fx - d * .8 * pull;
+    pill.v = (centre - near.w / 2 - pill.x) * 60;
+    pill.x = Math.min(items.at(-1).x, Math.max(items[0].x, centre - near.w / 2));
+    pill.w = pill.tw = near.w;
+    paintPill();
+    if (near.i !== drag.i) {
+      drag.i = near.i;
+      tick();
+      showTab(tabButtons()[near.i].dataset.tab, { glide: false });
+    }
+  });
+  const end = e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const was = drag.on;
+    drag = null;
+    if (was) { pill.v = 0; springPill(tabIndex(currentTab)); }
+  };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
+}
+
+function showTab(name, { glide = true } = {}) {
+  const from = tabIndex(currentTab), to = tabIndex(name);
+  const changed = name !== currentTab;
+  currentTab = name;
   for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === name);
-  for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== name;
+  for (const p of document.querySelectorAll('[data-panel]')) {
+    p.hidden = p.dataset.panel !== name;
+    // The new panel slides in from the side it comes from.
+    if (!p.hidden && changed && !stillMotion()) {
+      p.classList.remove('from-left', 'from-right');
+      void p.offsetWidth;
+      p.classList.add(to > from ? 'from-right' : 'from-left');
+    }
+  }
+  if (glide) springPill(to);
   const post = name === 'caption';
   $('cover').hidden = post;
   $('post').hidden = !post;
@@ -1010,8 +1113,11 @@ function wire() {
   }
   $('tabs').addEventListener('click', e => {
     const b = e.target.closest('button');
-    if (b) showTab(b.dataset.tab);
+    if (!b) return;
+    if (b.dataset.tab !== currentTab) tick();
+    showTab(b.dataset.tab);
   });
+  wireTabSlider();
   $('copy-caption-2').addEventListener('click', copyCaption);
   $('paste-caption').addEventListener('click', () => pasteInto($('caption')));
   $('paste-title').addEventListener('click', () => pasteInto($('title')));
