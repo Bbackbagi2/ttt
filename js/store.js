@@ -88,7 +88,7 @@ export const trash = id => both((drafts, bin) => {
 
 // Brings a draft back from the trash, if there is room for it.
 export async function restore(id) {
-  if ((await list()).length >= LIMIT) throw new Error(`초안은 ${LIMIT}개까지입니다. 하나를 비운 뒤 복원해 주세요.`);
+  if ((await list()).length >= LIMIT) throw new Error(`초안이 가득 찼습니다(최대 ${LIMIT}개). 하나를 지운 뒤 복원해 주세요.`);
   return both((drafts, bin) => {
     const req = bin.get(id);
     req.onsuccess = () => {

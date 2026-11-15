@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=24">
 <title>TTT</title>
 </head>
 <body>
@@ -198,8 +198,8 @@
             <button data-g="tile" class="on">Tile</button><button data-g="block">Block</button>
           </div>
         </div>
-        <p class="hint guide">창은 김 서린 큰 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
-        <p id="window-nophoto" class="warn" hidden>본문 사진이 아직 없습니다. Photos 탭에서 추가하면 첫 장이 창 너머로 보입니다.</p>
+        <p class="hint guide">창은 김 서린 큰 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여, 표지를 넘기면 사진이 이어집니다. 미리보기에서 창을 끌어 옮길 수 있습니다.</p>
+        <p id="window-nophoto" class="warn" hidden>본문 사진이 아직 없습니다. Photos 탭에서 사진을 넣으면 첫 사진이 창 너머로 보입니다.</p>
       </div>
     </section>
 
@@ -210,7 +210,7 @@
         <button id="paste-title" class="icon-btn field-btn" aria-label="Paste" title="Paste"><svg class="ic"><use href="#i-paste"/></svg></button>
       </div>
       <p id="lang" class="hint guide"></p>
-      <p id="title-warn" class="warn" hidden>제목이 타일에 들어가지 않습니다. 제목을 줄이거나, 타일을 늘리거나, 글자를 줄여 주세요.</p>
+      <p id="title-warn" class="warn" hidden>제목이 타일에 다 들어가지 않습니다. 제목을 줄이거나 타일 길이를 늘리거나 글자 크기를 줄여 주세요.</p>
       <div class="group">
         <div class="row" id="direction-field">
           <span class="label">방향</span>
@@ -236,7 +236,7 @@
     <!-- photos -->
     <section data-panel="photos" class="panel" hidden>
       <label class="btn wide"><svg class="ic"><use href="#i-add"/></svg>Add photos<input id="photo-input" type="file" accept="image/*" multiple hidden></label>
-      <p class="hint guide">표지 다음 장에 순서대로 들어갑니다. 테마 없이 3:4로 맞추며, 사진은 이 기기 안에서만 처리합니다.</p>
+      <p class="hint guide">사진은 표지 다음 장부터 순서대로 들어가고, 3:4 비율로 맞춥니다. 사진은 이 기기 밖으로 나가지 않습니다.</p>
       <ol id="photos" class="photos"></ol>
     </section>
 
@@ -258,7 +258,12 @@
 
     <!-- export -->
     <section data-panel="export" class="panel" hidden>
-      <p class="hint guide">① Prepare images를 누른 뒤 Save to Photos로 사진 앱에 저장합니다. ② 캡션을 복사합니다. ③ 인스타그램에서 사진을 순서대로 골라 게시합니다. ④ 게시가 끝나면 Mark as posted를 누릅니다.</p>
+      <ol class="hint guide steps">
+        <li>Prepare images → Save to Photos로 사진 앱에 저장합니다.</li>
+        <li>Copy caption으로 캡션을 복사합니다.</li>
+        <li>인스타그램에서 사진을 순서대로 골라 게시합니다.</li>
+        <li>게시를 마치면 Mark as posted를 누릅니다.</li>
+      </ol>
       <div class="group">
         <button id="export" class="btn primary wide"><svg class="ic"><use href="#i-export"/></svg><span id="export-label">Prepare images</span></button>
         <p id="export-status" class="hint"></p>
@@ -335,6 +340,6 @@
     <button id="action-cancel" class="btn quiet wide">Cancel</button>
   </div>
 </div>
-<script type="module" src="js/app.js?v=28"></script>
+<script type="module" src="js/app.js?v=29"></script>
 </body>
 </html>

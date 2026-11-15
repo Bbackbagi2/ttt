@@ -398,9 +398,9 @@ body.beginner .guide { display: block; }
 .home-guide { margin-top: 14px; }
 .coach { position: fixed; inset: 0; z-index: 50; }
 .coach-ring {
-  position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .62), 0 0 0 2px var(--primary);
+  position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .62), inset 0 0 0 2px var(--primary);
   transition: left .35s cubic-bezier(.22, 1, .36, 1), top .35s cubic-bezier(.22, 1, .36, 1),
-    width .35s cubic-bezier(.22, 1, .36, 1), height .35s cubic-bezier(.22, 1, .36, 1);
+    width .35s cubic-bezier(.22, 1, .36, 1), height .35s cubic-bezier(.22, 1, .36, 1), border-radius .35s;
   pointer-events: none;
 }
 .coach-bubble {
@@ -412,3 +412,15 @@ body.beginner .guide { display: block; }
 .coach-bubble p { margin: 4px 0 10px; font-size: 14.5px; line-height: 1.55; }
 .coach-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .coach-actions .btn { min-height: 38px; padding: 0 14px; font-size: 14px; }
+
+/* ------------------------------------------------------------ text: Korean line breaks and notes */
+/* Break Korean lines between words, not inside them; very long words still wrap. */
+body { word-break: keep-all; overflow-wrap: break-word; }
+.hint, .warn, .faq-item p, .coach-bubble p, .toast, .feed-caption { text-wrap: pretty; }
+.hint { line-height: 1.6; }
+.warn { line-height: 1.55; font-weight: 500; }
+.faq-item p { white-space: pre-line; }
+.steps { margin: 0; padding-left: 1.3em; gap: 4px; }   /* shown as a grid in beginner mode */
+body.beginner .steps.guide { display: grid; }
+.steps li::marker { color: var(--faint); font-variant-numeric: tabular-nums; }
+.toast { text-align: center; line-height: 1.45; }

@@ -1,5 +1,5 @@
 import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame, memoryStats } from './render.js?v=14';
-import * as store from './store.js?v=9';
+import * as store from './store.js?v=10';
 
 const $ = id => document.getElementById(id);
 const CAPTION_LIMIT = 2200;
@@ -129,7 +129,7 @@ function usedPictures() {
 function setUsed(id, on) {
   const m = usedPictures();
   if (on) m[id] = Date.now(); else delete m[id];
-  try { localStorage.setItem(USED_KEY, JSON.stringify(m)); } catch (_) { toast('이 브라우저에 저장하지 못했습니다'); }
+  try { localStorage.setItem(USED_KEY, JSON.stringify(m)); } catch (_) { toast('사용 표시를 저장하지 못했습니다'); }
 }
 // Unused pictures first; falls back to all of them once every picture has been used.
 function pickPicture(comps) {
@@ -167,6 +167,16 @@ const TOURS = {
   ],
 };
 
+// Corner radius of the iPhone screen, in points, when the page reaches the screen's bottom
+// corners (the home-screen app). Approximate published values by screen size; 14 elsewhere.
+function screenCorner() {
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (!standalone) return 14;
+  const w = Math.min(screen.width, screen.height), h = Math.max(screen.width, screen.height);
+  const sizes = { '402x874': 62, '440x956': 62, '393x852': 55, '430x932': 55, '390x844': 47, '428x926': 53, '375x812': 39, '414x896': 41 };
+  return sizes[`${w}x${h}`] ?? 14;
+}
+
 function maybeTour(name) {
   if (!settings.beginner || settings.toured?.[name] || !$('coach').hidden) return;
   const steps = TOURS[name]
@@ -177,9 +187,16 @@ function maybeTour(name) {
   const ring = $('coach').querySelector('.coach-ring'), bubble = $('coach').querySelector('.coach-bubble');
   const place = () => {
     const r = steps[i].el.getBoundingClientRect(), pad = 6;
-    const top = Math.max(2, r.top - pad), left = Math.max(2, r.left - pad);
-    const right = Math.min(window.innerWidth - 2, r.right + pad), bottom = Math.min(window.innerHeight - 2, r.bottom + pad);
-    Object.assign(ring.style, { left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px` });
+    const W = window.innerWidth, H = window.innerHeight;
+    const top = Math.max(0, r.top - pad), left = Math.max(0, r.left - pad);
+    const right = Math.min(W, r.right + pad), bottom = Math.min(H, r.bottom + pad);
+    // Where the ring meets the screen's bottom corners, it follows the screen's own curve.
+    const corner = screenCorner(), atBottom = bottom >= H - 1;
+    const round = (side, edge) => (atBottom && edge ? `${corner}px` : '14px');
+    Object.assign(ring.style, {
+      left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px`,
+      borderRadius: `14px 14px ${round('right', right >= W - 1)} ${round('left', left <= 1)}`,
+    });
     $('coach-text').textContent = steps[i].text;
     $('coach-step').textContent = `${i + 1} / ${steps.length}`;
     $('coach-next').textContent = i === steps.length - 1 ? 'Done' : 'Next';
@@ -205,11 +222,11 @@ function saveSettings() {
 // Help: questions and answers, collected here as they come up.
 const FAQ = [
   ['게시는 어떻게 하나요?',
-    'Export 탭에서 이미지를 사진 앱에 저장하고, 캡션을 복사해 인스타그램에 붙여넣습니다. 게시한 뒤 Mark as posted를 누르면 초안이 정리되고, 원하면 쓴 그림에 사용 표시가 붙습니다.'],
+    'Export 탭에서 이미지를 사진 앱에 저장하고, 캡션을 복사해 인스타그램에 붙여넣습니다.\n게시한 뒤 Mark as posted를 누르면 초안은 휴지통으로 옮겨지고, 원하면 쓴 그림에 사용 표시를 할 수 있습니다.'],
   ['창(Window)은 무엇인가요?',
-    '표지 벽에 낸 김 서린 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 유리는 Tile과 Block 중에서 고릅니다.'],
+    '표지 벽에 낸 김 서린 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여, 표지를 넘기면 사진이 이어집니다.\n유리는 Tile과 Block 중에서 고릅니다.'],
   ['초안은 어디에 저장되나요?',
-    `초안은 최대 ${store.LIMIT}개까지 이 기기의 이 앱 안에만 저장되고, 서버나 iCloud로 보내지 않습니다. 홈 화면 앱을 지우면 초안도 함께 지워질 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관합니다. 지운 초안은 휴지통에 ${store.TRASH_DAYS}일 동안 보관됩니다. 사진 원본은 사진 앱에 그대로 있습니다.`],
+    `초안은 최대 ${store.LIMIT}개까지 이 기기의 이 앱 안에만 저장되고, 서버나 iCloud로 보내지 않습니다. 사진 원본은 사진 앱에 그대로 있습니다.\n지운 초안은 휴지통에 ${store.TRASH_DAYS}일 동안 보관된 뒤 자동으로 삭제됩니다.\n홈 화면 앱과 Safari 탭은 초안을 따로 보관하고, 홈 화면 앱을 지우면 초안도 함께 지워질 수 있습니다.`],
 ];
 
 function settingsView(view) {
@@ -239,7 +256,7 @@ async function renderTrash() {
     name.textContent = d.title?.trim() || '제목 없음';
     const left = Math.max(0, Math.ceil((d.deleted + store.TRASH_DAYS * 864e5 - Date.now()) / 864e5));
     const when = document.createElement('span');
-    when.textContent = `${left}일 뒤 삭제 · 사진 ${d.photos.length}`;
+    when.textContent = `${left > 1 ? `${left}일 뒤 삭제` : '곧 삭제'} · 사진 ${d.photos.length}`;
     meta.append(name, when);
     const back = document.createElement('button');
     back.className = 'btn';
@@ -253,7 +270,7 @@ async function renderTrash() {
     del.setAttribute('aria-label', 'Delete forever');
     del.append(icon('trash'));
     del.addEventListener('click', async () => {
-      if (!confirm(`"${name.textContent}"을(를) 완전히 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      if (!confirm(`"${name.textContent}" 초안을 완전히 삭제할까요?\n되돌릴 수 없습니다.`)) return;
       await store.purge(d.id); renderTrash();
     });
     li.append(img, meta, back, del);
@@ -361,7 +378,7 @@ function wireSettings() {
   });
   $('empty-trash').addEventListener('click', async () => {
     const n = (await store.listTrash()).length;
-    if (!n || !confirm(`휴지통의 초안 ${n}개를 완전히 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    if (!n || !confirm(`휴지통의 초안 ${n}개를 모두 완전히 삭제할까요?\n되돌릴 수 없습니다.`)) return;
     await store.emptyTrash(); renderTrash();
   });
   $('open-help').addEventListener('click', () => {
@@ -455,7 +472,7 @@ async function renderHome() {
 let ready = null;
 async function whenReady() {
   if (!catalog) {
-    toast('표지 자원을 불러오는 중입니다…');
+    toast('표지 자료를 불러오는 중…');
     catalog = await ready;
   }
 }
@@ -722,7 +739,7 @@ function syncDirection() {
   const text = draft.title.trim();
   const ko = language(text) === 'ko';
   $('direction-field').hidden = !ko;
-  $('lang').textContent = !text ? '비워 두면 제목 타일 없이 만듭니다.' : ko ? '한국어 제목 · 가로 또는 세로' : '영어 제목 · 가로';
+  $('lang').textContent = !text ? '제목을 비워 두면 제목 타일 없이 만듭니다.' : ko ? '한국어 제목은 가로·세로 모두 쓸 수 있습니다.' : '영어 제목은 가로로만 씁니다.';
   for (const b of $('direction').querySelectorAll('button')) {
     b.classList.toggle('on', String(+!!draft.vertical) === b.dataset.v);
   }
@@ -973,8 +990,8 @@ function showPreviewMode(v) {
   $('feed').hidden = v !== 'feed';
   $('grid').hidden = v !== 'grid';
   $('preview-note').textContent = v === 'feed'
-    ? '피드에서 보일 모습입니다. 넘기면 다음 장과 그 장의 캡션이 보입니다. 실제 앱 화면과 조금 다를 수 있습니다.'
-    : '프로필 격자에서 이번 표지가 놓일 자리입니다(3:4 격자 기준). 회색 칸은 이전 게시물 자리이며, 이전 게시물은 저장하지 않습니다.';
+    ? '피드에서 보일 모습입니다. 넘기면 다음 장과 그 장의 캡션이 보입니다. 실제 인스타그램 화면과는 조금 다를 수 있습니다.'
+    : '프로필 격자에서 이번 표지가 놓일 자리입니다. 회색 칸은 이전 게시물 자리입니다.';
 }
 
 function syncFeed() {
@@ -1046,7 +1063,7 @@ async function exportImages() {
     prepared = await prepareFiles();
     button.disabled = false;
     $('export-label').textContent = `Save ${prepared.length} to Photos`;
-    status.textContent = '준비되었습니다. 버튼을 한 번 더 눌러 저장하세요.';
+    status.textContent = '준비됐습니다. 버튼을 한 번 더 누르면 저장합니다.';
     return;
   }
   // Share must be called directly from the tap, so the files are prepared beforehand.
@@ -1071,7 +1088,7 @@ async function exportImages() {
     box.append(a);
   }
   box.hidden = false;
-  status.textContent = '이 브라우저는 한 번에 저장을 지원하지 않습니다. 이미지를 길게 눌러 저장하세요.';
+  status.textContent = '이 브라우저는 한꺼번에 저장할 수 없습니다. 이미지를 하나씩 길게 눌러 저장해 주세요.';
 }
 
 // Pastes the clipboard at the cursor of a field, like a text editor's Paste.
@@ -1079,7 +1096,7 @@ async function pasteInto(field) {
   let text = '';
   try { text = await navigator.clipboard.readText(); } catch (_) {
     field.focus();
-    toast('길게 눌러 붙여넣기를 써 주세요');
+    toast('입력 칸을 길게 눌러 붙여넣어 주세요');
     return;
   }
   if (!text) { toast('클립보드가 비어 있습니다'); return; }
@@ -1098,20 +1115,20 @@ async function copyText(text, done) {
     showTab('caption');
     const t = $('caption');
     t.focus(); t.select();
-    toast('캡션을 선택했습니다. 복사를 눌러 주세요');
+    toast('캡션을 선택했습니다. 메뉴에서 복사를 눌러 주세요');
   }
 }
 const copyCaption = () => copyText(currentCaption(), multiple() ? `${slide + 1}번 캡션을 복사했습니다` : '캡션을 복사했습니다');
 
 // After posting, offer to mark the cover picture as used so it moves to the end of the list.
 async function posted() {
-  if (!confirm('게시를 마쳤나요? 이 초안을 기기에서 지웁니다.')) return;
+  if (!confirm('게시를 마쳤나요?\n초안은 휴지통으로 옮겨 10일 동안 보관합니다.')) return;
   const item = normalize(draft).mode === 'picture' && catalog.compositions.find(c => c.id === draft.composition);
   if (item && !usedPictures()[item.id]
-      && confirm(`이번 표지 그림("${item.name}")을 사용한 그림으로 표시할까요?\n표시하면 그림 목록 맨 아래로 가고 체크가 붙습니다.`)) {
+      && confirm(`표지 그림 "${item.name}"에 사용 표시를 할까요?\n그림 목록에서 맨 뒤로 가고 체크가 붙습니다.`)) {
     setUsed(item.id, true);
   }
-  await discard('게시 완료. 초안은 휴지통에 10일 보관됩니다');
+  await discard('게시 완료 · 초안은 휴지통에 보관했습니다');
 }
 
 // Moves the open draft to the trash: stops autosave first, waits for a save already running.
@@ -1462,7 +1479,7 @@ function wire() {
   $('done').addEventListener('click', posted);
   $('unmark-used').addEventListener('click', () => {
     const item = catalog.compositions.find(c => c.id === draft.composition);
-    if (!item || !confirm(`"${item.name}"의 사용 표시를 지울까요? 목록에서 원래 자리로 돌아갑니다.`)) return;
+    if (!item || !confirm(`"${item.name}"의 사용 표시를 지울까요?\n그림 목록에서 원래 자리로 돌아갑니다.`)) return;
     setUsed(item.id, false);
     renderCompositions();
   });
@@ -1497,7 +1514,7 @@ function wire() {
   wireNavigation();
   wireSettings();
   ready = init();
-  ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
+  ready.then(c => { catalog = c; }, () => toast('표지 자료를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   applyBeginner();
   store.persist();
   store.sweepTrash().catch(() => {});
