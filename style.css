@@ -135,12 +135,13 @@ body.editing .home { transform: translateX(-22%); opacity: .35; }
   display: grid; grid-template-columns: repeat(5, 1fr);
   /* Close to the bottom edge: the labels only need to clear the home indicator bar itself
      (about 13 pt up), not the whole 34 pt inset, which made the bar look lifted. */
-  padding: 8px 4px max(6px, calc(var(--safe-bottom, env(safe-area-inset-bottom)) - 16px));
+  /* Inset from the sides so the first and last tabs sit clear of the screen's rounded corners. */
+  padding: 4px 18px max(6px, calc(var(--safe-bottom, env(safe-area-inset-bottom)) - 16px));
   background: var(--bg); border-top: 1px solid var(--line);
 }
 .tabbar button {
-  position: relative; display: grid; justify-items: center; gap: 2px;
-  border: 0; background: transparent; padding: 4px 0; font-size: 10.5px; color: var(--faint);
+  position: relative; display: grid; justify-items: center; align-content: center; gap: 3px;
+  min-height: 52px; border: 0; background: transparent; padding: 4px 0; font-size: 10.5px; color: var(--faint);
 }
 .tabbar button.on { color: var(--ink); }
 .tabbar button.on .ic { color: var(--primary); }
@@ -322,3 +323,10 @@ textarea { resize: none; min-height: 170px; line-height: 1.55; }
 }
 .starters img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .starters button.used img { opacity: .45; }
+
+/* while typing: the tab bar steps aside so it never rides on the keyboard */
+body.typing .editor > .tabbar { display: none; }
+body.typing .editor { padding-bottom: 0; }
+.field-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.field-btn { width: 44px; height: 44px; background: var(--raised); border-radius: var(--r); }
+.btn-pair { display: flex; gap: 8px; }

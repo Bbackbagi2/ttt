@@ -38,14 +38,20 @@ function safeAreas() {
   return { top: Math.round(r.height), bottom: Math.round(r.width) };
 }
 
+// True while a text field has focus (the keyboard is up).
+const typing = () => document.body.classList.contains('typing');
+
 // Lays the editor out over the area iOS actually shows, measured each time it can change.
 function fitHeight() {
   const standalone = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
   const short = Math.min(screen.width, screen.height), long = Math.max(screen.width, screen.height);
   const portrait = matchMedia('(orientation: portrait)').matches;
   const vv = window.visualViewport;
-  const top = vv ? Math.max(0, Math.round(vv.offsetTop)) : 0;
-  const h = Math.round(vv ? vv.height : window.innerHeight);
+  // The layout viewport, not the visual one: the keyboard shrinks the visual viewport, and
+  // following it made the tab bar ride up with the keyboard. While typing, keep the last size.
+  if (typing() && fitHeight.last) return;
+  const top = 0;
+  const h = Math.round(window.innerHeight);
   const reference = short === REFERENCE.width && long === REFERENCE.height;
   const stage = reference ? REFERENCE.stage
     : Math.round(Math.min(460, Math.max(240, REFERENCE.stage * long / REFERENCE.height)));
@@ -823,6 +829,22 @@ async function exportImages() {
   status.textContent = '이 브라우저는 한 번에 저장을 지원하지 않습니다. 이미지를 길게 눌러 저장하세요.';
 }
 
+// Pastes the clipboard at the cursor of a field, like a text editor's Paste.
+async function pasteInto(field) {
+  let text = '';
+  try { text = await navigator.clipboard.readText(); } catch (_) {
+    field.focus();
+    toast('길게 눌러 붙여넣기를 써 주세요');
+    return;
+  }
+  if (!text) { toast('클립보드가 비어 있습니다'); return; }
+  if (field.tagName === 'INPUT') text = text.replace(/\s*\n\s*/g, ' ');
+  const start = field.selectionStart ?? field.value.length, end = field.selectionEnd ?? start;
+  field.setRangeText(text, start, end, 'end');
+  field.dispatchEvent(new Event('input'));
+  toast('붙여넣었습니다');
+}
+
 async function copyText(text, done) {
   try {
     await navigator.clipboard.writeText(text);
@@ -909,7 +931,20 @@ function showTab(name) {
 
 function wire() {
   $('back').addEventListener('click', () => goHome());
-  $('title').addEventListener('input', e => { draft.title = e.target.value; syncDirection(); schedule(); });
+  // Korean is typed through composition; redrawing the cover mid-syllable stalls the keyboard and
+  // drops letters. Keep the text, and redraw once the syllable is done and typing pauses.
+  let composing = false;
+  const titleChanged = () => {
+    draft.title = $('title').value;
+    syncDirection();
+    if (composing) return;
+    prepared = null;
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(drawCover, 350);
+  };
+  $('title').addEventListener('compositionstart', () => { composing = true; });
+  $('title').addEventListener('compositionend', () => { composing = false; titleChanged(); });
+  $('title').addEventListener('input', titleChanged);
   $('direction').addEventListener('click', e => {
     const v = e.target.closest('button')?.dataset.v;
     if (v === undefined || (v === '1') === !!draft.vertical) return;
@@ -978,6 +1013,8 @@ function wire() {
     if (b) showTab(b.dataset.tab);
   });
   $('copy-caption-2').addEventListener('click', copyCaption);
+  $('paste-caption').addEventListener('click', () => pasteInto($('caption')));
+  $('paste-title').addEventListener('click', () => pasteInto($('title')));
   for (const b of document.querySelectorAll('.dpad button')) {
     b.addEventListener('click', () => {
       const i = nudge(draft, +b.dataset.dx, +b.dataset.dy);
@@ -1059,10 +1096,20 @@ function wire() {
   if (window.history.state) window.history.replaceState(null, '');
   fitHeight();
   window.addEventListener('resize', fitHeight);
-  window.visualViewport?.addEventListener('resize', fitHeight);
   window.addEventListener('orientationchange', () => setTimeout(fitHeight, 300));
   window.addEventListener('pageshow', fitHeight);
   watchBars();
+  // While a text field is focused the tab bar steps aside, so it never rides on the keyboard.
+  const isField = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text'));
+  document.addEventListener('focusin', e => { if (isField(e.target)) document.body.classList.add('typing'); });
+  document.addEventListener('focusout', e => {
+    if (!isField(e.target)) return;
+    setTimeout(() => {
+      if (isField(document.activeElement)) return;
+      document.body.classList.remove('typing');
+      fitHeight();
+    }, 80);
+  });
   window.addEventListener('scroll', () => {
     $('home').querySelector('.home-head').classList.toggle('scrolled', window.scrollY > 4);
   }, { passive: true });

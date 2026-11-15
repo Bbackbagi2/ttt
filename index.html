@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 <title>TTT</title>
 </head>
 <body>
@@ -38,6 +38,7 @@
   <symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/><path d="M3 16l4-4 4 4 2-2 4 4"/></symbol>
   <symbol id="i-caption" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></symbol>
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 12h6M9 16h4"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></symbol>
@@ -178,7 +179,10 @@
 
     <!-- title -->
     <section data-panel="title" class="panel" hidden>
-      <input id="title" class="text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="제목을 적어 주세요">
+      <div class="field-row">
+        <input id="title" class="text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="제목을 적어 주세요">
+        <button id="paste-title" class="icon-btn field-btn" aria-label="Paste" title="Paste"><svg class="ic"><use href="#i-paste"/></svg></button>
+      </div>
       <p id="lang" class="hint"></p>
       <p id="title-warn" class="warn" hidden>제목이 타일에 들어가지 않습니다. 제목을 줄이거나, 타일을 늘리거나, 글자를 줄여 주세요.</p>
       <div class="group">
@@ -219,7 +223,10 @@
       <textarea id="caption" rows="6" placeholder="인스타그램에 붙여넣을 캡션"></textarea>
       <div class="row">
         <span id="caption-count" class="hint">0 / 2,200</span>
-        <button id="copy-caption-2" class="btn"><svg class="ic sm"><use href="#i-copy"/></svg><span id="copy-caption-2-label">Copy</span></button>
+        <span class="btn-pair">
+          <button id="paste-caption" class="btn"><svg class="ic sm"><use href="#i-paste"/></svg>Paste</button>
+          <button id="copy-caption-2" class="btn"><svg class="ic sm"><use href="#i-copy"/></svg><span id="copy-caption-2-label">Copy</span></button>
+        </span>
       </div>
     </section>
 
@@ -276,6 +283,6 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
-<script type="module" src="js/app.js?v=21"></script>
+<script type="module" src="js/app.js?v=22"></script>
 </body>
 </html>
