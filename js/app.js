@@ -1399,7 +1399,7 @@ function driveTo(i) {
 }
 
 // ---- A: arc dial
-const ARC = { R: 300, STEP: 17, PX: 64 };
+const ARC = { R: 300, STEP: 13, PX: 60 };
 const arc = { pos: 0, v: 0, target: 0, raf: 0, items: [], ticks: [] };
 
 function buildArc() {
@@ -1415,8 +1415,13 @@ function buildArc() {
     const it = document.createElement('button');
     it.className = 'arc-item';
     it.dataset.i = i;
-    it.setAttribute('aria-label', tabLabel(b));
-    it.append(b.querySelector('svg').cloneNode(true));
+    const disc = document.createElement('span');
+    disc.className = 'arc-disc';
+    disc.append(b.querySelector('svg').cloneNode(true));
+    const name = document.createElement('span');
+    name.className = 'arc-name';
+    name.textContent = tabLabel(b);
+    it.append(disc, name);
     wheel.append(it);
     return it;
   });
@@ -1435,7 +1440,6 @@ function paintArc() {
     t.style.transform = `rotate(${a}deg) translateY(${-ARC.R - 34}px)`;
     t.style.opacity = String(Math.max(0, 1 - Math.abs(a) / 60) * (t.dataset.k % 2 ? .45 : 1));
   });
-  $('arc-label').textContent = tabLabel(tabButtons()[on]);
 }
 
 function arcTo(i, instant) {
@@ -1492,8 +1496,7 @@ const knob = { pos: 0, v: 0, target: 0, raf: 0 };
 function paintKnob() {
   const n = tabButtons().length, on = Math.round(Math.min(n - 1, Math.max(0, knob.pos)));
   $('knob').style.transform = `rotate(${knob.pos * KNOB_STEP}deg)`;
-  $('knob-label').textContent = tabLabel(tabButtons()[on]);
-  [...$('knob-dots').children].forEach((dot, i) => dot.classList.toggle('on', i === on));
+  [...$('knob-tabs').children].forEach((b, i) => b.classList.toggle('on', i === on));
 }
 
 function knobTo(i, instant) {
@@ -1503,7 +1506,13 @@ function knobTo(i, instant) {
 }
 
 function wireKnob() {
-  $('knob-dots').replaceChildren(...tabButtons().map(() => document.createElement('i')));
+  // The same icons and names as the tab bar, in a row beside the knob; a tap goes straight there.
+  $('knob-tabs').replaceChildren(...tabButtons().map((b, i) => {
+    const t = document.createElement('button');
+    t.append(b.querySelector('svg').cloneNode(true), document.createTextNode(tabLabel(b)));
+    t.addEventListener('click', () => { tick(); knobTo(i); driveTo(i); });
+    return t;
+  }));
   const el = $('knob');
   let d = null;
   const angle = e => {
