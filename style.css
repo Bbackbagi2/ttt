@@ -106,7 +106,7 @@ body.editing .home { transform: translateX(-22%); opacity: .35; }
 
 .stage { display: flex; justify-content: center; padding: 4px 16px 12px; }
 .preview {
-  height: min(44vh, 440px); width: auto; aspect-ratio: 3 / 4; max-width: 100%;
+  height: var(--stage-h, min(44vh, 440px)); width: auto; aspect-ratio: 3 / 4; max-width: 100%;
   border-radius: 4px; background: #1d1f21;
   box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
 }
@@ -206,7 +206,7 @@ textarea { resize: none; min-height: 170px; line-height: 1.55; }
 }
 
 /* ------------------------------------------------------------ caption: Instagram-style post preview */
-.post { width: min(100%, calc(min(44vh, 440px) * .6)); display: grid; gap: 7px; }
+.post { width: min(100%, calc(var(--stage-h, min(44vh, 440px)) * .6)); display: grid; gap: 7px; }
 .post-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; background: #1d4383; color: #fff0d6; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
 .carousel-wrap { position: relative; }

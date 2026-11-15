@@ -1,4 +1,4 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=9';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=10';
 import * as store from './store.js?v=8';
 
 const $ = id => document.getElementById(id);
@@ -18,19 +18,28 @@ const homeUrls = new Set();   // object URLs of the draft thumbnails on the home
 function url(blob, set = urls) { const u = URL.createObjectURL(blob); set.add(u); return u; }
 function releaseUrls(set = urls) { set.forEach(u => URL.revokeObjectURL(u)); set.clear(); }
 
-// ---------------------------------------------------------------- screen height
+// ---------------------------------------------------------------- screen size
+// The layout is drawn for the iPhone 16 Pro screen (402 x 874 pt). On that screen the fixed
+// sizes below are used as they are; on any other screen they scale with the screen height.
+//
 // A home-screen app has no Safari toolbar, but iOS can still size the page at launch as if the
 // toolbar were there, which left the tab bar floating above the bottom. There the editor takes
 // the full screen height instead.
+const REFERENCE = { width: 402, height: 874, stage: 384 };
+
 function fitHeight() {
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const short = Math.min(screen.width, screen.height), long = Math.max(screen.width, screen.height);
+  const portrait = matchMedia('(orientation: portrait)').matches;
   let h = window.innerHeight;
-  if (standalone) {
-    const portrait = matchMedia('(orientation: portrait)').matches;
-    const [a, b] = [screen.width, screen.height];
-    h = Math.max(h, portrait ? Math.max(a, b) : Math.min(a, b));
-  }
-  document.documentElement.style.setProperty('--app-h', h + 'px');
+  if (standalone) h = Math.max(h, portrait ? long : short);
+  const reference = short === REFERENCE.width && long === REFERENCE.height;
+  const stage = reference ? REFERENCE.stage
+    : Math.round(Math.min(460, Math.max(240, REFERENCE.stage * h / REFERENCE.height)));
+  const root = document.documentElement.style;
+  root.setProperty('--app-h', h + 'px');
+  root.setProperty('--stage-h', stage + 'px');
+  document.documentElement.dataset.screen = reference ? 'reference' : 'scaled';
 }
 
 function toast(text) {

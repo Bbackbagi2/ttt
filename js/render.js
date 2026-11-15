@@ -6,6 +6,8 @@ const COLS = 12, ROWS = 16;
 const FONT = 'TTTTitle';
 const GLASS = [214, 228, 230];   // pale blue-green tint of the window glass
 const FROST = .35;                // fixed semi-transparent glass
+const EDGE = [150, 186, 180];     // the greener colour of thick glass seen edge-on
+const bevelWidth = S => Math.round(clamp(S * .045, 9, 20));
 
 let catalog = null;
 let atlas = null;           // ImageData of tiles.png
@@ -285,17 +287,27 @@ function windowPane(behind, x0, y0, n, frost, rand) {
     const top = data[a] + (data[b] - data[a]) * fx;
     return top + (data[c] + (data[d] - data[c]) * fx - top) * fy;
   };
+  // The pane is one thick glass tile with rounded edges, raised from the wall like the
+  // small tiles. Near its edges the thick glass bends the view inward.
+  const BW = bevelWidth(S);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const k = (y * S + x) * 4;
       const t = ((oy + y) % T * T + (ox + x) % T) * 4;
       const cap = drops[t + 2] / 255;
+      const ex = Math.min(x, S - 1 - x), ey = Math.min(y, S - 1 - y);
+      const bev = Math.max(0, 1 - Math.min(ex, ey) / BW);
+      let bx = 0, by = 0;
+      if (bev > 0) {
+        const push = bev * bev * BW * .9;
+        if (ex <= ey) bx = x < S / 2 ? push : -push; else by = y < S / 2 ? push : -push;
+      }
       if (cap > 0) {
         // A drop is a small lens: it shows the view flipped and a little sharper,
         // darkens toward its rim and carries a highlight from the upper-left light.
         const nx = (drops[t] - 128) / 127, ny = (drops[t + 1] - 128) / 127;
         const bend = 7 + 9 * cap;
-        const sx = x + pad - nx * bend, sy = y + pad - ny * bend;
+        const sx = x + pad + bx - nx * bend, sy = y + pad + by - ny * bend;
         const rim = .8 + .2 * Math.sqrt(cap);
         const lit = Math.max(0, nx * .55 + ny * .8);
         const d = Math.hypot(nx + .36, ny + .46);
@@ -308,9 +320,10 @@ function windowPane(behind, x0, y0, n, frost, rand) {
         // Mist: the view goes soft and pale where it is thick.
         const f = clamp(fog[t + 3] / 255 * thick, 0, 1);
         const blur = Math.min(1, f * 1.5), white = f * .62;
-        const i = ((y + pad) * B + x + pad) * 4;
+        const sx = x + pad + bx, sy = y + pad + by;
         for (let ch = 0; ch < 3; ch++) {
-          const v = sharp[i + ch] + (soft[i + ch] - sharp[i + ch]) * blur;
+          const a = sample(sharp, sx, sy, ch);
+          const v = a + (sample(soft, sx, sy, ch) - a) * blur;
           o[k + ch] = v + (fog[t + ch] - v) * white;
         }
       }
@@ -350,20 +363,35 @@ function windowPane(behind, x0, y0, n, frost, rand) {
   g.fillRect(0, 0, S, S);
   g.restore();
 
-  // Depth of the opening: the top and left inner edges sit in shadow, the bottom and right catch light.
-  const edge = Math.max(8, Math.round(S * .05));
-  const shade = (x0g, y0g, x1g, y1g, color, x, y, w, h) => {
-    const gr = g.createLinearGradient(x0g, y0g, x1g, y1g);
-    gr.addColorStop(0, color);
-    gr.addColorStop(1, color.replace(/[\d.]+\)$/, '0)'));
-    g.fillStyle = gr;
-    g.fillRect(x, y, w, h);
-  };
-  shade(0, 0, 0, edge * 1.6, 'rgba(20,28,32,.38)', 0, 0, S, edge * 1.6);
-  shade(0, 0, edge * 1.2, 0, 'rgba(20,28,32,.26)', 0, 0, edge * 1.2, S);
-  shade(0, S, 0, S - edge * .5, 'rgba(255,255,255,.3)', 0, S - edge * .5, S, edge * .5);
-  shade(S, 0, S - edge * .5, 0, 'rgba(255,255,255,.22)', S - edge * .5, 0, edge * .5, S);
-  return g.getImageData(0, 0, S, S);
+  // Raised edge, lit like the wall tiles from the upper left: the top and left bevels catch
+  // the light, the bottom and right bevels turn away from it, and the thick edge looks greener.
+  const img = g.getImageData(0, 0, S, S), q = img.data;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const ex = Math.min(x, S - 1 - x), ey = Math.min(y, S - 1 - y);
+      const e = Math.min(ex, ey);
+      if (e >= BW) continue;
+      const bev = 1 - e / BW;
+      const side = ex <= ey ? (x < S / 2 ? .75 : -.6) : (y < S / 2 ? 1 : -.8);
+      const amount = bev ** 1.4 * side;
+      const k = (y * S + x) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        let v = q[k + ch];
+        v += (EDGE[ch] - v) * bev * .28;
+        v += amount > 0 ? (255 - v) * amount * .62 : v * amount * .42;
+        q[k + ch] = v;
+      }
+    }
+  }
+  // A thin bright line where the flat face turns into the bevel, as on glazed tiles.
+  for (let i = 0; i < S; i++) {
+    for (const [x, y, a] of [[i, BW, .22], [BW, i, .16]]) {
+      if (x < BW || y < BW || x >= S - BW || y >= S - BW) continue;
+      const k = (y * S + x) * 4;
+      for (let ch = 0; ch < 3; ch++) q[k + ch] += (255 - q[k + ch]) * a;
+    }
+  }
+  return img;
 }
 
 // Layout index that puts the block at (px, py), keeping the title on the same side if possible.
