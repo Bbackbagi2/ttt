@@ -22,23 +22,27 @@ function releaseUrls(set = urls) { set.forEach(u => URL.revokeObjectURL(u)); set
 // The layout is drawn for the iPhone 16 Pro screen (402 x 874 pt). On that screen the fixed
 // sizes below are used as they are; on any other screen they scale with the screen height.
 //
-// A home-screen app has no Safari toolbar, but iOS can still size the page at launch as if the
-// toolbar were there, which left the tab bar floating above the bottom. There the editor takes
-// the full screen height instead.
+// iOS home-screen apps (26.1 and later) can give the page less than the full screen and still
+// report a bottom safe-area inset; see fitHeight.
 const REFERENCE = { width: 402, height: 874, stage: 384 };
 
 function fitHeight() {
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   const short = Math.min(screen.width, screen.height), long = Math.max(screen.width, screen.height);
   const portrait = matchMedia('(orientation: portrait)').matches;
-  let h = window.innerHeight;
-  if (standalone) h = Math.max(h, portrait ? long : short);
+  // The page gets only the height iOS gives it; sizing it to the full screen hid the tab bar labels.
+  const h = window.innerHeight;
   const reference = short === REFERENCE.width && long === REFERENCE.height;
   const stage = reference ? REFERENCE.stage
-    : Math.round(Math.min(460, Math.max(240, REFERENCE.stage * h / REFERENCE.height)));
+    : Math.round(Math.min(460, Math.max(240, REFERENCE.stage * long / REFERENCE.height)));
   const root = document.documentElement.style;
   root.setProperty('--app-h', h + 'px');
   root.setProperty('--stage-h', stage + 'px');
+  // When a home-screen app's page stops short of the screen bottom, the home indicator is not over
+  // the page, so its safe-area inset would only lift the tab bar off the bottom.
+  const shortfall = (portrait ? long : short) - h;
+  if (standalone && shortfall > 40) root.setProperty('--safe-bottom', '0px');
+  else root.removeProperty('--safe-bottom');
   document.documentElement.dataset.screen = reference ? 'reference' : 'scaled';
 }
 
@@ -357,6 +361,15 @@ function persistDraft(d = draft) {
   return saving;
 }
 
+// The save note shows briefly, then fades so the bar stays clear.
+function showSaved(text, stay = false) {
+  const el = $('saved');
+  el.textContent = text;
+  el.classList.remove('gone');
+  clearTimeout(showSaved.timer);
+  if (!stay) showSaved.timer = setTimeout(() => el.classList.add('gone'), 1600);
+}
+
 async function saveDraft(draft) {
   const small = document.createElement('canvas');
   small.width = 162; small.height = 216;
@@ -364,9 +377,9 @@ async function saveDraft(draft) {
   draft.thumb = await toBlob(small, .8);
   try {
     await store.save(draft);
-    $('saved').textContent = '이 기기에 저장됨';
+    showSaved('이 기기에 저장됨');
   } catch (e) {
-    $('saved').textContent = '저장 실패';
+    showSaved('저장 실패', true);
     toast(e.message);
   }
 }
@@ -964,6 +977,7 @@ function wire() {
   if (window.history.state) window.history.replaceState(null, '');
   fitHeight();
   window.addEventListener('resize', fitHeight);
+  window.visualViewport?.addEventListener('resize', fitHeight);
   wire();
   wireNavigation();
   ready = init();
