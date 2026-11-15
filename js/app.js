@@ -1,4 +1,4 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=11';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=12';
 import * as store from './store.js?v=8';
 
 const $ = id => document.getElementById(id);

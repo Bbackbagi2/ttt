@@ -261,6 +261,15 @@ export function setGlass(layer, body) {
   steam.body = body;
 }
 
+// The tile's own glass over a colour channel: its milky body, then the light and shade of its relief.
+function glassTile(v, ch, body, shade) {
+  v += (GLASS[ch] * (.8 + .32 * body) - v) * .34;
+  return shade > 0 ? v + (255 - v) * shade * .55 : v * (1 + shade * .45);
+}
+
+// 'glass' (default) or 'mist': which layer lies in front. See windowPane.
+export function setFront(front) { steam.front = front; }
+
 function windowPane(behind, x0, y0, n, frost, rand) {
   const S = n * P, pad = 24, B = S + 2 * pad;
   const src = document.createElement('canvas');
@@ -294,8 +303,15 @@ function windowPane(behind, x0, y0, n, frost, rand) {
   const ox = Math.floor(rand() * Math.max(1, T - S)), oy = Math.floor(rand() * Math.max(1, T - S));
   const fog = steam.fog.data, drops = steam.drops.data;
   const thick = clamp(frost / FROST, 0, 1.6);
-  const BEND = 11, MILK = .34;
+  const BEND = 11;
 
+  // Which layer is nearer the viewer: 'glass' puts the tile's milk and relief over the
+  // condensation (the water is inside or behind the glass); 'mist' puts the water on its face.
+  const mistFront = steam.front === 'mist';
+  // Drops thin out toward the tile's rim, most on the top and left where the photographed
+  // tile shows its raised, lit edge; there the mist is even instead of beaded.
+  const smooth = v => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
+  const wl = S * .1, wt = S * .1, wr = S * .055, wb = S * .055;
   const out = new ImageData(S, S), o = out.data;
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -308,37 +324,37 @@ function windowPane(behind, x0, y0, n, frost, rand) {
         shade = (td[ti + 2] - 128) / 127;
         if (milk) body = milk[ti] / 255;
       }
+      const e = Math.min(smooth(x / wl - .25), smooth(y / wt - .25), smooth((S - x) / wr - .25), smooth((S - y) / wb - .25));
       const t = ((oy + y) % T * T + (ox + x) % T) * 4;
-      const cap = drops[t + 2] / 255;
+      const cap = drops[t + 2] / 255 * e;
+      // Mist: the view goes soft and pale where it is thick.
+      let f = clamp(fog[t + 3] / 255 * thick, 0, 1);
+      f += (.5 * thick - f) * (1 - e);
+      const blur = Math.min(1, f * 1.5), white = f * .55;
+      const sx = x + pad + bx, sy = y + pad + by;
+      let nx = 0, ny = 0, bend = 0, rim = 1, lit = 0, spec = 0;
       if (cap > 0) {
         // A drop is a small lens: it shows the view flipped and a little sharper,
         // darkens toward its rim and carries a highlight from the upper-left light.
-        const nx = (drops[t] - 128) / 127, ny = (drops[t + 1] - 128) / 127;
-        const bend = 7 + 9 * cap;
-        const sx = x + pad + bx - nx * bend, sy = y + pad + by - ny * bend;
-        const rim = .8 + .2 * Math.sqrt(cap);
-        const lit = Math.max(0, nx * .55 + ny * .8);
+        nx = (drops[t] - 128) / 127; ny = (drops[t + 1] - 128) / 127;
+        bend = 7 + 9 * cap;
+        rim = .8 + .2 * Math.sqrt(cap);
+        lit = Math.max(0, nx * .55 + ny * .8);
         const d = Math.hypot(nx + .36, ny + .46);
-        const spec = cap > .25 ? Math.max(0, 1 - d / .24) ** 2 : 0;
-        for (let ch = 0; ch < 3; ch++) {
-          o[k + ch] = sample(sharp, sx, sy, ch) * rim + 12 + 95 * lit * lit * (1 - cap) + 235 * spec;
-        }
-      } else {
-        // Mist: the view goes soft and pale where it is thick.
-        const f = clamp(fog[t + 3] / 255 * thick, 0, 1);
-        const blur = Math.min(1, f * 1.5), white = f * .55;
-        const sx = x + pad + bx, sy = y + pad + by;
-        for (let ch = 0; ch < 3; ch++) {
-          const a = sample(sharp, sx, sy, ch);
-          const v = a + (sample(soft, sx, sy, ch) - a) * blur;
-          o[k + ch] = v + (fog[t + ch] - v) * white;
-        }
+        spec = cap > .25 ? Math.max(0, 1 - d / .24) ** 2 : 0;
       }
-      // The tile's own glass: its milky body, then the light and shade of its relief on top.
       for (let ch = 0; ch < 3; ch++) {
-        let v = o[k + ch];
-        v += (GLASS[ch] * (.8 + .32 * body) - v) * MILK;
-        v = shade > 0 ? v + (255 - v) * shade * .55 : v * (1 + shade * .45);
+        const a = sample(sharp, sx, sy, ch);
+        let v = a + (sample(soft, sx, sy, ch) - a) * blur;
+        if (mistFront) v = glassTile(v, ch, body, shade);
+        v += (fog[t + ch] - v) * white;
+        if (cap > 0) {
+          let w = sample(sharp, sx - nx * bend, sy - ny * bend, ch);
+          if (mistFront) w = glassTile(w, ch, body, shade);
+          w = w * rim + 12 + 95 * lit * lit * (1 - cap) + 235 * spec;
+          v += (w - v) * Math.min(1, e * 1.4);
+        }
+        if (!mistFront) v = glassTile(v, ch, body, shade);
         o[k + ch] = v;
       }
       o[k + 3] = 255;
