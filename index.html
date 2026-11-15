@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bbackbagi2.github.io/ttt/icon-ce8623c-180.png?v=4">
 <link rel="icon" type="image/png" sizes="180x180" href="icon-ce8623c-180.png">
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 <title>TTT</title>
 </head>
 <body>
@@ -90,6 +90,10 @@
       <div class="list">
         <label class="list-row"><span>햅틱</span><input id="opt-haptics" type="checkbox" switch></label>
       </div>
+      <p class="group-label">보관</p>
+      <div class="list">
+        <button id="open-trash" class="list-row"><span>휴지통</span><span class="row-end"><span id="trash-count" class="count"></span><svg class="ic sm chev"><use href="#i-chev"/></svg></span></button>
+      </div>
       <p class="group-label">도움말</p>
       <div class="list">
         <button id="open-help" class="list-row"><span>자주 묻는 질문</span><svg class="ic sm chev"><use href="#i-chev"/></svg></button>
@@ -99,6 +103,12 @@
         <label class="list-row"><span>개발자 모드</span><input id="opt-dev" type="checkbox" switch></label>
       </div>
       <pre id="dev-info" class="dev-info" hidden></pre>
+    </div>
+    <div id="settings-trash" hidden>
+      <p class="hint trash-hint">지운 초안은 10일 동안 보관된 뒤 자동으로 삭제됩니다.</p>
+      <ol id="trash-list" class="trash-list"></ol>
+      <p id="trash-empty" class="hint trash-hint" hidden>휴지통이 비어 있습니다.</p>
+      <button id="empty-trash" class="btn quiet wide danger"><svg class="ic sm"><use href="#i-trash"/></svg>Empty trash</button>
     </div>
     <div id="settings-help" hidden>
       <div id="faq" class="list faq"></div>
@@ -253,7 +263,7 @@
         <ol id="caption-copies" class="copies" hidden></ol>
         <button id="done" class="btn wide"><svg class="ic"><use href="#i-check"/></svg>Mark as posted</button>
       </div>
-      <button id="delete" class="btn quiet wide"><svg class="ic sm"><use href="#i-trash"/></svg>Delete draft</button>
+      <button id="delete" class="btn quiet wide"><svg class="ic sm"><use href="#i-trash"/></svg>Move to trash</button>
     </section>
   </div>
 
@@ -296,8 +306,19 @@
   </div>
 </div>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" hidden><span id="toast-text"></span><button id="toast-action" hidden></button></div>
+
+<!-- long-press actions for a draft card -->
+<div id="actions" class="actions-sheet" hidden>
+  <div class="actions-backdrop"></div>
+  <div class="actions-panel" role="dialog" aria-label="Draft actions">
+    <p id="actions-title" class="actions-title"></p>
+    <button id="action-open" class="btn wide">Open</button>
+    <button id="action-trash" class="btn wide danger"><svg class="ic sm"><use href="#i-trash"/></svg>Move to trash</button>
+    <button id="action-cancel" class="btn quiet wide">Cancel</button>
+  </div>
+</div>
 <label id="haptic" class="haptic" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
-<script type="module" src="js/app.js?v=25"></script>
+<script type="module" src="js/app.js?v=26"></script>
 </body>
 </html>

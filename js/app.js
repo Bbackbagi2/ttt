@@ -1,5 +1,5 @@
-import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame } from './render.js?v=13';
-import * as store from './store.js?v=8';
+import { init, render, language, layouts, preparePhoto, normalize, nudge, locate, windowFrame, memoryStats } from './render.js?v=14';
+import * as store from './store.js?v=9';
 
 const $ = id => document.getElementById(id);
 const CAPTION_LIMIT = 2200;
@@ -14,6 +14,7 @@ let behind = { key: null, canvas: null };   // first body photo fitted to 3:4, s
 const COVER_KEYS = ['composition', 'seed', 'layout', 'vertical', 'mode', 'window', 'titleLength', 'titleSize'];
 const urls = new Set();       // object URLs made by the editor
 const homeUrls = new Set();   // object URLs of the draft thumbnails on the home screen
+const trashUrls = new Set();  // object URLs of the thumbnails on the trash page
 
 function url(blob, set = urls) { const u = URL.createObjectURL(blob); set.add(u); return u; }
 function releaseUrls(set = urls) { set.forEach(u => URL.revokeObjectURL(u)); set.clear(); }
@@ -86,12 +87,22 @@ function watchBars() {
   ro.observe($('tabs'));
 }
 
-function toast(text) {
-  const t = $('toast');
-  t.textContent = text; t.hidden = false;
+// A short message; with an action (like Undo) it stays a little longer and offers a button.
+function toast(text, action) {
+  const t = $('toast'), b = $('toast-action');
+  $('toast-text').textContent = text;
+  b.hidden = !action;
+  b.onclick = null;
+  if (action) {
+    b.textContent = action.label;
+    b.onclick = () => { t.hidden = true; action.run(); };
+  }
+  t.hidden = false;
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { t.hidden = true; }, 2200);
+  toast.timer = setTimeout(() => { t.hidden = true; }, action ? 5000 : 2200);
 }
+
+const mb = n => (n / 1048576).toFixed(n < 10485760 ? 2 : 1) + ' MB';
 
 function seed() { return (Math.random() * 2 ** 31) >>> 0; }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -146,21 +157,63 @@ const FAQ = [
   ['창(Window)은 무엇인가요?',
     '표지 벽에 낸 김 서린 유리 타일입니다. 다음 장(본문 첫 사진)의 같은 자리가 비쳐 보여서, 표지에서 넘기면 사진이 이어집니다. 유리는 Tile과 Block 중에서 고릅니다.'],
   ['초안은 어디에 저장되나요?',
-    '초안은 최대 3개까지 이 기기의 이 앱 안에만 저장되고, 서버나 iCloud로 보내지 않습니다. 홈 화면 앱을 지우면 초안도 함께 지워질 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관합니다. 사진 원본은 사진 앱에 그대로 있습니다.'],
+    `초안은 최대 ${store.LIMIT}개까지 이 기기의 이 앱 안에만 저장되고, 서버나 iCloud로 보내지 않습니다. 홈 화면 앱을 지우면 초안도 함께 지워질 수 있고, 홈 화면 앱과 Safari 탭은 초안을 따로 보관합니다. 지운 초안은 휴지통에 ${store.TRASH_DAYS}일 동안 보관됩니다. 사진 원본은 사진 앱에 그대로 있습니다.`],
 ];
 
 function settingsView(view) {
   $('settings-main').hidden = view !== 'main';
   $('settings-help').hidden = view !== 'help';
-  $('settings-title').textContent = view === 'help' ? '자주 묻는 질문' : 'Settings';
+  $('settings-trash').hidden = view !== 'trash';
+  $('settings-title').textContent = { help: '자주 묻는 질문', trash: '휴지통' }[view] || 'Settings';
+  if (view === 'trash') renderTrash();
+  if (view === 'main') store.listTrash().then(t => { $('trash-count').textContent = t.length || ''; });
   $('settings').querySelector('.page-body').scrollTop = 0;
+}
+
+async function renderTrash() {
+  const items = await store.listTrash();
+  $('trash-count').textContent = items.length || '';
+  $('trash-empty').hidden = items.length > 0;
+  $('empty-trash').hidden = !items.length;
+  releaseUrls(trashUrls);
+  $('trash-list').replaceChildren(...items.map(d => {
+    const li = document.createElement('li');
+    const img = document.createElement('img');
+    if (d.thumb) img.src = url(d.thumb, trashUrls);
+    img.alt = '';
+    const meta = document.createElement('span');
+    meta.className = 'trash-meta';
+    const name = document.createElement('strong');
+    name.textContent = d.title?.trim() || '제목 없음';
+    const left = Math.max(0, Math.ceil((d.deleted + store.TRASH_DAYS * 864e5 - Date.now()) / 864e5));
+    const when = document.createElement('span');
+    when.textContent = `${left}일 뒤 삭제 · 사진 ${d.photos.length}`;
+    meta.append(name, when);
+    const back = document.createElement('button');
+    back.className = 'btn';
+    back.textContent = 'Restore';
+    back.addEventListener('click', async () => {
+      try { await store.restore(d.id); } catch (e) { toast(e.message); return; }
+      toast('초안을 되살렸습니다'); renderTrash(); renderHome();
+    });
+    const del = document.createElement('button');
+    del.className = 'icon-btn danger';
+    del.setAttribute('aria-label', 'Delete forever');
+    del.append(icon('trash'));
+    del.addEventListener('click', async () => {
+      if (!confirm(`"${name.textContent}"을(를) 완전히 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      await store.purge(d.id); renderTrash();
+    });
+    li.append(img, meta, back, del);
+    return li;
+  }));
 }
 
 function renderSettings() {
   $('opt-haptics').checked = settings.haptics;
   $('opt-dev').checked = settings.dev;
   $('dev-info').hidden = !settings.dev;
-  if (settings.dev) renderDevInfo();
+  liveDevInfo(settings.dev);
   $('faq').replaceChildren(...FAQ.map(([q, a]) => {
     const d = document.createElement('details');
     d.className = 'faq-item';
@@ -173,14 +226,46 @@ function renderSettings() {
   }));
 }
 
-// Developer info: what this device reports, for checking the layout on a phone.
-function renderDevInfo() {
+// Developer info, refreshed while it is on screen: this device's layout numbers, the storage
+// the app holds, and an estimate of the image memory it keeps (iOS gives pages no heap figure).
+let devTimer = 0;
+function liveDevInfo(on) {
+  clearInterval(devTimer);
+  if (on) { renderDevInfo(); devTimer = setInterval(renderDevInfo, 1500); }
+}
+
+function editorMemory() {
+  let n = 0;
+  for (const src of slideThumbs.values()) n += src.length * .75;          // base64 JPEG data URLs
+  if (behind.canvas) n += behind.canvas.width * behind.canvas.height * 4;
+  n += 1080 * 1440 * 4;                                                    // the cover canvas
+  return n;
+}
+
+async function renderDevInfo() {
   const standalone = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
   const safe = safeAreas();
   const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '-';
   const build = document.querySelector('script[src*="app.js"]')?.getAttribute('src').split('?v=')[1] || '-';
+  const est = await navigator.storage?.estimate?.().catch(() => null);
+  const use = await store.usage().catch(() => null);
+  let local = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); local += (k.length + (localStorage.getItem(k) || '').length) * 2; } } catch (_) { /* blocked */ }
+  const heap = performance.memory ? `${mb(performance.memory.usedJSHeapSize)} / ${mb(performance.memory.jsHeapSizeLimit)}` : 'n/a (iOS)';
+  const mem = memoryStats();
+  if ($('dev-info').hidden) return;
   $('dev-info').textContent = [
-    `build v${build}`,
+    `build v${build} · ${new Date().toLocaleTimeString('ko-KR')}`,
+    '— storage',
+    est ? `used ${mb(est.usage || 0)} of ${mb(est.quota || 0)}` : 'used n/a',
+    use ? `drafts ${use.drafts} · ${mb(use.draftBytes)}` : '',
+    use ? `trash ${use.trash} · ${mb(use.trashBytes)}` : '',
+    `localStorage ${(local / 1024).toFixed(1)} KB`,
+    '— memory (estimate)',
+    `renderer images ${mb(mem.total)} (assets ${mb(mem.assets)}, pictures ${mem.pictures})`,
+    `editor images ${mb(editorMemory())}`,
+    `JS heap ${heap}`,
+    '— screen',
     `standalone ${standalone}`,
     `screen ${screen.width}×${screen.height} · dpr ${devicePixelRatio}`,
     `inner ${innerWidth}×${innerHeight}`,
@@ -204,6 +289,7 @@ function openSettings() {
 
 function closeSettings() {
   if (!document.body.classList.contains('in-settings')) return;
+  liveDevInfo(false);
   document.body.classList.remove('in-settings');
   $('home').inert = false;
   setTimeout(() => { if (!document.body.classList.contains('in-settings')) $('settings').hidden = true; }, 420);
@@ -215,6 +301,15 @@ function wireSettings() {
     if (window.history.state?.settings) window.history.back();
     else closeSettings();
   });
+  $('open-trash').addEventListener('click', () => {
+    settingsView('trash');
+    window.history.pushState({ settings: 'trash' }, '');
+  });
+  $('empty-trash').addEventListener('click', async () => {
+    const n = (await store.listTrash()).length;
+    if (!n || !confirm(`휴지통의 초안 ${n}개를 완전히 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    await store.emptyTrash(); renderTrash();
+  });
   $('open-help').addEventListener('click', () => {
     settingsView('help');
     window.history.pushState({ settings: 'help' }, '');
@@ -224,11 +319,35 @@ function wireSettings() {
     settings.dev = e.target.checked;
     saveSettings();
     $('dev-info').hidden = !settings.dev;
-    if (settings.dev) renderDevInfo();
+    liveDevInfo(settings.dev);
   });
 }
 
 // ---------------------------------------------------------------- home
+
+// Press and hold: fires after half a second unless the finger moves or lifts first.
+function onLongPress(el, fn) {
+  let timer = 0, x = 0, y = 0;
+  const cancel = () => clearTimeout(timer);
+  el.addEventListener('pointerdown', e => {
+    x = e.clientX; y = e.clientY;
+    timer = setTimeout(() => { tick(); fn(); }, 480);
+  });
+  el.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - x, e.clientY - y) > 10) cancel(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, cancel));
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+// The action sheet for a draft card (press and hold on home).
+function showActions(d) {
+  $('actions-title').textContent = d.title?.trim() || '제목 없는 초안';
+  const close = () => { $('actions').hidden = true; };
+  $('action-open').onclick = () => { close(); openDraft(d.id); };
+  $('action-trash').onclick = () => { close(); trashDraft(d.id); };
+  $('action-cancel').onclick = close;
+  $('actions').querySelector('.actions-backdrop').onclick = close;
+  $('actions').hidden = false;
+}
 
 // Home: the drafts as cover cards, and one New post card after them while there is room.
 async function renderHome() {
@@ -251,7 +370,8 @@ async function renderHome() {
       img.alt = '';
       card.append(img);
       card.setAttribute('aria-label', `${d.title?.trim() || '제목 없는 초안'} 열기`);
-      card.addEventListener('click', () => openDraft(d.id));
+      card.addEventListener('click', () => { if (!card.pressed) openDraft(d.id); card.pressed = false; });
+      onLongPress(card, () => { card.pressed = true; showActions(d); });
       const name = document.createElement('strong');
       name.textContent = d.title?.trim() || '제목 없음';
       if (!d.title?.trim()) name.className = 'untitled';
@@ -365,7 +485,7 @@ function wireNavigation() {
     if (!st.sheet && !$('sheet').hidden) $('sheet').hidden = true;
     if (!st.editor && editing()) closeEditor();
     if (!st.settings) closeSettings();
-    else if (st.settings === 'main' && !$('settings-help').hidden) settingsView('main');
+    else if (st.settings === 'main' && $('settings-main').hidden) settingsView('main');
   });
   // Swipe right from the left edge to go back, following the finger.
   const ed = $('editor');
@@ -928,24 +1048,34 @@ async function posted() {
       && confirm(`이번 표지 그림("${item.name}")을 사용한 그림으로 표시할까요?\n표시하면 그림 목록 맨 아래로 가고 체크가 붙습니다.`)) {
     setUsed(item.id, true);
   }
-  await discard();
+  await discard('게시 완료. 초안은 휴지통에 10일 보관됩니다');
 }
 
-// Deletes the open draft: stops autosave first, waits for a save already running, then removes it.
-async function discard() {
+// Moves the open draft to the trash: stops autosave first, waits for a save already running.
+async function discard(message = '휴지통으로 옮겼습니다') {
   clearTimeout(saveTimer); clearTimeout(renderTimer);
   const id = draft.id;
   draft = null;
   await saving.catch(() => {});
-  await store.remove(id);
-  toast('초안을 지웠습니다');
+  await trashDraft(id, message);
   goHome(false);
 }
 
-async function finish(message) {
-  if (!confirm(message)) return;
-  await discard();
+// Trash with an Undo, from the editor or a card on home.
+async function trashDraft(id, message = '휴지통으로 옮겼습니다') {
+  await store.trash(id);
+  if (!editing()) renderHome();
+  toast(message, {
+    label: '되돌리기',
+    run: async () => {
+      try { await store.restore(id); } catch (e) { toast(e.message); return; }
+      renderHome();
+      toast('초안을 되살렸습니다');
+    },
+  });
 }
+
+
 
 // ---------------------------------------------------------------- drag to pan the window photo
 
@@ -1255,7 +1385,8 @@ function wire() {
     setUsed(item.id, false);
     renderCompositions();
   });
-  $('delete').addEventListener('click', () => finish('이 초안을 삭제할까요? 되돌릴 수 없습니다.'));
+  // Recoverable for 10 days and undoable at once, so no confirmation is asked.
+  $('delete').addEventListener('click', () => discard());
 }
 
 (async () => {
@@ -1287,5 +1418,6 @@ function wire() {
   ready = init();
   ready.then(c => { catalog = c; }, () => toast('자원을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
   store.persist();
+  store.sweepTrash().catch(() => {});
   renderHome();
 })();

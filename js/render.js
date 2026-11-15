@@ -518,3 +518,15 @@ export function preparePhoto(img, fit, background = '#ffffff') {
 }
 
 export const SIZE = { W, H, P };
+
+// Bytes of decoded image data the renderer keeps in memory, for the developer readout.
+export function memoryStats() {
+  const size = d => (d ? (d.data ? d.data.byteLength : (d.naturalWidth || d.width || 0) * (d.naturalHeight || d.height || 0) * 4) : 0);
+  let assets = size(atlas) + size(steam.fog) + size(steam.drops);
+  for (const f of Object.values(frames)) assets += size(f);
+  for (const list of Object.values(glazes)) for (const g of list || []) assets += size(g);
+  for (const g of Object.values(steam.glass)) assets += size(g.relief) + size(g.body);
+  let pics = 0;
+  for (const p of pictures.values()) pics += size(p);
+  return { total: assets + pics, assets, pictures: `${pictures.size} · ${(pics / 1048576).toFixed(1)} MB` };
+}

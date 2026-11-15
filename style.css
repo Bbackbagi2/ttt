@@ -365,3 +365,31 @@ body.in-settings #settings { transform: none; }
 .faq-item p { margin: 0; padding: 0 16px 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .dev-info { margin: 10px 0 0; padding: 12px 14px; border-radius: var(--r); background: var(--raised);
   font: 12px/1.55 ui-monospace, Menlo, monospace; color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+
+/* ------------------------------------------------------------ undo toast, card actions, trash */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast button { border: 0; background: none; padding: 2px 0; color: var(--primary); font-weight: 600; font-size: 13px; }
+.slot .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.danger { color: var(--warn); }
+.btn.danger { color: var(--warn); }
+.actions-sheet { position: fixed; inset: 0; z-index: 40; }
+.actions-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .5); animation: fade-in .2s ease; }
+.actions-panel {
+  position: absolute; left: 12px; right: 12px; bottom: calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 12px);
+  max-width: 536px; margin: 0 auto; display: grid; gap: 8px; padding: 14px 12px 12px;
+  border-radius: 18px; background: var(--raised); animation: sheet-up .32s cubic-bezier(.22, 1, .36, 1);
+}
+.actions-title { margin: 0 4px 4px; font-size: 13px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.actions-panel .btn { background: var(--control); }
+.actions-panel .btn.quiet { background: transparent; }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } }
+.row-end { display: flex; align-items: center; gap: 8px; }
+.trash-hint { margin: 8px 4px 12px; }
+.trash-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.trash-list li { display: grid; grid-template-columns: 42px 1fr auto auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r); background: var(--raised); }
+.trash-list img { width: 42px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 5px; background: var(--sunken); }
+.trash-meta { display: grid; gap: 2px; min-width: 0; }
+.trash-meta strong { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trash-meta span { font-size: 12px; color: var(--faint); }
+.trash-list .btn { min-height: 36px; padding: 0 12px; font-size: 13px; }
